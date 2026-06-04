@@ -3,38 +3,36 @@ name: Deploy to VPS
 on:
   push:
     branches:
-      - main   # main branch pe push hone pe auto-deploy
+      - main
 
 jobs:
   deploy:
-    name: Deploy via SSH
+    name: Deploy to calling.officialdigitalmarketing.in
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Deploy to server via SSH
+      - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.VPS_HOST }}       # Server IP
-          username: ${{ secrets.VPS_USER }}   # SSH username (e.g. root or ubuntu)
-          key: ${{ secrets.VPS_SSH_KEY }}     # SSH private key
-          port: ${{ secrets.VPS_PORT || 22 }} # SSH port (default 22)
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
           script: |
             set -e
-
-            APP_DIR="${{ secrets.DEPLOY_PATH }}"   # e.g. /var/www/retell-dashboard
+            cd /var/www/retell-dashboard
 
             echo ">>> Pulling latest code..."
-            cd "$APP_DIR"
             git pull origin main
 
             echo ">>> Installing dependencies..."
             npm install --omit=dev
 
-            echo ">>> Restarting app with PM2..."
-            pm2 restart retell-dashboard --update-env || pm2 start "node --experimental-sqlite server.js" --name retell-dashboard
+            echo ">>> Restarting app..."
+            pm2 restart retell-dashboard --update-env
             pm2 save
 
-            echo ">>> Deploy complete!"
+            echo ">>> Deploy complete! Site: https://calling.officialdigitalmarketing.in"
