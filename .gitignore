@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Environment secrets — NEVER commit
+.env
+
+# SQLite database files
+database/dashboard.db
+database/dashboard.db-shm
+database/dashboard.db-wal
+
+# Uploaded files and local recordings
+uploads/
+public/recordings/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
