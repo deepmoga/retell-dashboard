@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Leads — VoiceAgent</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="app-layout">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">V</div>
+      <div><div class="logo-text">VoiceAgent</div><div class="logo-sub">Dashboard</div></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Main</div>
+      <a class="nav-item" href="/dashboard" data-page="dashboard"><span class="nav-icon">📊</span><span class="nav-label">Dashboard</span></a>
+      <a class="nav-item" href="/calls" data-page="calls"><span class="nav-icon">📞</span><span class="nav-label">Call Logs</span></a>
+      <a class="nav-item" href="/live" data-page="live"><span class="nav-icon">🔴</span><span class="nav-label">Live Calls</span><span class="nav-badge green" id="live-badge" style="display:none">0</span></a>
+      <a class="nav-item" href="/leads" data-page="leads"><span class="nav-icon">👥</span><span class="nav-label">Leads</span></a>
+      <a class="nav-item" href="/costs" data-page="costs"><span class="nav-icon">💰</span><span class="nav-label">Cost Tracker</span></a>
+      <div class="nav-section" data-admin-only>Admin</div>
+      <a class="nav-item" href="/clients" data-page="clients" data-admin-only><span class="nav-icon">⚙️</span><span class="nav-label">Clients</span></a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar" id="sidebar-user-avatar">A</div>
+        <div><div class="user-name" id="sidebar-user-name">Loading...</div><div class="user-role" id="sidebar-user-role"></div></div>
+      </div>
+      <button id="logout-btn" class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:10px">🚪 Logout</button>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Lead Management</div>
+        <div class="page-sub"><span id="lead-count">0</span> leads total</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-secondary btn-sm" id="upload-btn">⬆ Upload CSV</button>
+        <button class="btn btn-primary btn-sm" id="add-lead-btn">+ Add Lead</button>
+      </div>
+    </div>
+
+    <div class="page-body">
+      <!-- Filter + Bulk Bar -->
+      <div class="filter-bar">
+        <select id="filter-status">
+          <option value="all">All Statuses</option>
+          <option value="pending">Pending</option>
+          <option value="called">Called</option>
+          <option value="qualified">Qualified</option>
+          <option value="callback">Callback</option>
+          <option value="not_interested">Not Interested</option>
+        </select>
+      </div>
+
+      <div class="bulk-bar" id="bulk-bar">
+        <span class="bulk-count" id="bulk-count">0</span> leads selected
+        <button class="btn btn-primary btn-sm" id="bulk-call-btn">📞 Call Selected</button>
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('select-all').checked=false;document.getElementById('select-all').dispatchEvent(new Event('change'))">Clear</button>
+      </div>
+
+      <!-- Table -->
+      <div class="card">
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:36px"><input type="checkbox" id="select-all" title="Select all"></th>
+                <th>Name</th><th>Phone</th><th>City</th><th>Status</th>
+                <th>Last Called</th><th>Calls</th><th>Notes</th><th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="leads-tbody">
+              <tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text-muted)">Loading leads...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- CSV Format Guide -->
+      <div style="margin-top:20px;padding:16px 20px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);font-size:13px;color:var(--text-muted)">
+        <strong style="color:var(--text)">CSV Format:</strong>
+        Accepted columns (case-insensitive): <code style="color:var(--accent)">Name, Phone, Email, City, Notes</code>
+        — Phone can be local format (04XXXXXXXX) or E.164 (+61XXXXXXXXX)
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Upload Modal -->
+<div class="modal-overlay" id="upload-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Upload CSV Leads</div>
+      <button class="modal-close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="upload-zone" id="drop-zone">
+        <div class="upload-icon">📂</div>
+        <p>Drag & drop your CSV file here</p>
+        <p style="margin-top:6px">or <span class="upload-link">click to browse</span></p>
+        <input type="file" id="csv-file-input" accept=".csv" style="display:none">
+      </div>
+      <div id="upload-result" style="margin-top:12px;font-size:13px;text-align:center"></div>
+      <div style="margin-top:14px;padding:12px;background:var(--surface2);border-radius:4px;font-size:12px;color:var(--text-muted)">
+        <strong>Required column:</strong> Phone<br>
+        <strong>Optional columns:</strong> Name, Email, City, Notes
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Lead Modal -->
+<div class="modal-overlay" id="add-lead-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Add New Lead</div>
+      <button class="modal-close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Full Name</label>
+          <input type="text" id="new-name" class="form-control" placeholder="Jane Smith">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Phone Number *</label>
+          <input type="tel" id="new-phone" class="form-control" placeholder="0412 345 678">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input type="email" id="new-email" class="form-control" placeholder="jane@example.com">
+        </div>
+        <div class="form-group">
+          <label class="form-label">City</label>
+          <input type="text" id="new-city" class="form-control" placeholder="Sydney">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notes</label>
+        <textarea id="new-notes" class="form-control" rows="3" placeholder="Any notes..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary modal-close">Cancel</button>
+      <button class="btn btn-primary" id="add-lead-submit">Add Lead</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Lead Modal -->
+<div class="modal-overlay" id="edit-lead-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Edit Lead</div>
+      <button class="modal-close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-lead-id">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Name</label>
+          <input type="text" id="edit-name" class="form-control">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Phone</label>
+          <input type="tel" id="edit-phone" class="form-control">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">City</label>
+          <input type="text" id="edit-city" class="form-control">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notes</label>
+        <textarea id="edit-notes" class="form-control" rows="3"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary modal-close">Cancel</button>
+      <button class="btn btn-primary" id="save-lead-btn">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Call Confirm Modal -->
+<div class="modal-overlay" id="call-confirm-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Initiate Call</div>
+      <button class="modal-close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p style="margin-bottom:16px;color:var(--text-muted)">
+        You are about to call <strong id="confirm-lead-name" style="color:var(--text)"></strong>
+      </p>
+      <input type="hidden" id="confirm-lead-id">
+      <div class="form-group">
+        <label class="form-label">Select Agent</label>
+        <select id="call-agent" class="form-control">
+          <option value="">Loading agents...</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">From Number</label>
+        <select id="call-from" class="form-control">
+          <option value="">Loading numbers...</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary modal-close">Cancel</button>
+      <button class="btn btn-primary" id="confirm-call-btn">📞 Start Call</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/app.js"></script>
+<script src="/js/leads.js"></script>
+</body>
+</html>

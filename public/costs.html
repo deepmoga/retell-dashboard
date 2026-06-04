@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cost Tracker — VoiceAgent</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<div class="app-layout">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">V</div>
+      <div><div class="logo-text">VoiceAgent</div><div class="logo-sub">Dashboard</div></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Main</div>
+      <a class="nav-item" href="/dashboard" data-page="dashboard"><span class="nav-icon">📊</span><span class="nav-label">Dashboard</span></a>
+      <a class="nav-item" href="/calls" data-page="calls"><span class="nav-icon">📞</span><span class="nav-label">Call Logs</span></a>
+      <a class="nav-item" href="/live" data-page="live"><span class="nav-icon">🔴</span><span class="nav-label">Live Calls</span><span class="nav-badge green" id="live-badge" style="display:none">0</span></a>
+      <a class="nav-item" href="/leads" data-page="leads"><span class="nav-icon">👥</span><span class="nav-label">Leads</span></a>
+      <a class="nav-item" href="/costs" data-page="costs"><span class="nav-icon">💰</span><span class="nav-label">Cost Tracker</span></a>
+      <div class="nav-section" data-admin-only>Admin</div>
+      <a class="nav-item" href="/clients" data-page="clients" data-admin-only><span class="nav-icon">⚙️</span><span class="nav-label">Clients</span></a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar" id="sidebar-user-avatar">A</div>
+        <div><div class="user-name" id="sidebar-user-name">Loading...</div><div class="user-role" id="sidebar-user-role"></div></div>
+      </div>
+      <button id="logout-btn" class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:10px">🚪 Logout</button>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Cost Tracker</div>
+        <div class="page-sub">Monthly billing and usage breakdown</div>
+      </div>
+    </div>
+
+    <div class="page-body">
+      <!-- Summary Cards -->
+      <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
+        <div class="stat-card accent">
+          <div class="stat-label">Total This Month</div>
+          <div class="stat-value" id="cost-total">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Retell AI</div>
+          <div class="stat-value" id="cost-retell">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Twilio</div>
+          <div class="stat-value" id="cost-twilio">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">LLM</div>
+          <div class="stat-value" id="cost-llm">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Total Minutes</div>
+          <div class="stat-value" id="cost-minutes">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Cost Per Call</div>
+          <div class="stat-value" id="cost-per-call">—</div>
+        </div>
+      </div>
+
+      <!-- Budget Alert -->
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header"><div class="card-title">Monthly Budget</div></div>
+        <div class="card-body">
+          <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:16px">
+            <div class="form-group" style="margin:0;flex:0 0 200px">
+              <label class="form-label">Budget Limit (USD)</label>
+              <input type="number" id="budget-input" class="form-control" placeholder="e.g. 500" min="0" step="10">
+            </div>
+            <button class="btn btn-secondary" id="save-budget">Set Budget</button>
+          </div>
+          <div class="progress-bar" style="margin-bottom:8px">
+            <div class="progress-fill" id="budget-fill" style="width:0%"></div>
+          </div>
+          <div style="font-size:13px;color:var(--text-muted)" id="budget-label">No budget set</div>
+          <div id="budget-warning" style="display:none;margin-top:10px;padding:10px 14px;background:var(--warning-dim);border:1px solid rgba(243,156,18,0.3);border-radius:4px;color:var(--warning);font-size:13px">
+            ⚠️ You have used over 80% of your monthly budget
+          </div>
+        </div>
+      </div>
+
+      <!-- Chart -->
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header"><div class="card-title">Daily Cost Breakdown — Last 30 Days</div></div>
+        <div class="card-body">
+          <canvas id="cost-chart" height="120"></canvas>
+        </div>
+      </div>
+
+      <!-- Daily Table -->
+      <div class="card">
+        <div class="card-header"><div class="card-title">Daily Cost Log</div></div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th><th>Calls</th><th>Minutes</th>
+                <th>Retell AI</th><th>Twilio</th><th>LLM</th><th>Total</th>
+              </tr>
+            </thead>
+            <tbody id="costs-tbody">
+              <tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted)">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="/js/app.js"></script>
+<script src="/js/costs.js"></script>
+</body>
+</html>

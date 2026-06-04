@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clients — VoiceAgent</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="app-layout">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">V</div>
+      <div><div class="logo-text">VoiceAgent</div><div class="logo-sub">Dashboard</div></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Main</div>
+      <a class="nav-item" href="/dashboard" data-page="dashboard"><span class="nav-icon">📊</span><span class="nav-label">Dashboard</span></a>
+      <a class="nav-item" href="/calls" data-page="calls"><span class="nav-icon">📞</span><span class="nav-label">Call Logs</span></a>
+      <a class="nav-item" href="/live" data-page="live"><span class="nav-icon">🔴</span><span class="nav-label">Live Calls</span><span class="nav-badge green" id="live-badge" style="display:none">0</span></a>
+      <a class="nav-item" href="/leads" data-page="leads"><span class="nav-icon">👥</span><span class="nav-label">Leads</span></a>
+      <a class="nav-item" href="/costs" data-page="costs"><span class="nav-icon">💰</span><span class="nav-label">Cost Tracker</span></a>
+      <div class="nav-section">Admin</div>
+      <a class="nav-item" href="/clients" data-page="clients"><span class="nav-icon">⚙️</span><span class="nav-label">Clients</span></a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar" id="sidebar-user-avatar">A</div>
+        <div><div class="user-name" id="sidebar-user-name">Loading...</div><div class="user-role" id="sidebar-user-role"></div></div>
+      </div>
+      <button id="logout-btn" class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:10px">🚪 Logout</button>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Client Management</div>
+        <div class="page-sub">Manage all client accounts (Admin only)</div>
+      </div>
+      <button class="btn btn-primary btn-sm" id="add-client-btn">+ Add Client</button>
+    </div>
+
+    <div class="page-body">
+      <div class="card">
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th><th>Email</th><th>Company</th>
+                <th>Calls This Month</th><th>Cost This Month</th><th>Created</th><th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="clients-tbody">
+              <tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted)">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Add Client Modal -->
+<div class="modal-overlay" id="add-client-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Add New Client</div>
+      <button class="modal-close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Full Name *</label>
+          <input type="text" id="new-client-name" class="form-control" placeholder="John Smith">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Email *</label>
+          <input type="email" id="new-client-email" class="form-control" placeholder="john@company.com">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Password *</label>
+          <input type="password" id="new-client-password" class="form-control" placeholder="Min 8 characters">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Company Name</label>
+          <input type="text" id="new-client-company" class="form-control" placeholder="Acme Corp">
+        </div>
+      </div>
+      <hr style="border-color:var(--border);margin:16px 0">
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">API Credentials (Optional)</div>
+      <div class="form-group">
+        <label class="form-label">Retell AI API Key</label>
+        <input type="text" id="new-client-retell" class="form-control" placeholder="key_...">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Twilio Account SID</label>
+          <input type="text" id="new-client-twilio-sid" class="form-control" placeholder="AC...">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Twilio Auth Token</label>
+          <input type="password" id="new-client-twilio-token" class="form-control" placeholder="••••••••">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary modal-close">Cancel</button>
+      <button class="btn btn-primary" id="save-client-btn">Create Client</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Client Modal -->
+<div class="modal-overlay" id="edit-client-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Edit Client</div>
+      <button class="modal-close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-client-id">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Full Name</label>
+          <input type="text" id="edit-client-name" class="form-control">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Company Name</label>
+          <input type="text" id="edit-client-company" class="form-control">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">New Password <span style="color:var(--text-muted);font-weight:400">(leave blank to keep current)</span></label>
+        <input type="password" id="edit-client-password" class="form-control" placeholder="New password...">
+      </div>
+      <hr style="border-color:var(--border);margin:16px 0">
+      <div class="form-group">
+        <label class="form-label">Retell AI API Key</label>
+        <input type="text" id="edit-client-retell" class="form-control">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Twilio Account SID</label>
+          <input type="text" id="edit-client-twilio-sid" class="form-control">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Twilio Auth Token</label>
+          <input type="password" id="edit-client-twilio-token" class="form-control" placeholder="••••••••">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary modal-close">Cancel</button>
+      <button class="btn btn-primary" id="update-client-btn">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/app.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+  if (!requireAuth()) return;
+  const user = getUser();
+  if (user?.role !== 'admin') { window.location.href = '/dashboard'; return; }
+  await loadClients();
+  bindEvents();
+});
+
+async function loadClients() {
+  try {
+    const [clientsData, costsData] = await Promise.all([
+      apiGet('/clients'),
+      apiGet('/costs/by-client').catch(() => ({ clients: [] })),
+    ]);
+
+    const costMap = {};
+    (costsData.clients || []).forEach(c => { costMap[c.id] = c; });
+
+    const tbody = document.getElementById('clients-tbody');
+    const clients = clientsData.clients || [];
+
+    if (!clients.length) {
+      tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">👤</div><p>No clients yet</p></div></td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = clients.map(c => {
+      const cost = costMap[c.id] || {};
+      return `
+        <tr>
+          <td>
+            <div style="font-weight:500">${escHtml(c.name)}</div>
+          </td>
+          <td style="color:var(--text-muted)">${escHtml(c.email)}</td>
+          <td>${escHtml(c.company_name || '—')}</td>
+          <td>${cost.total_calls || 0}</td>
+          <td>${cost.total_cost ? '$' + parseFloat(cost.total_cost).toFixed(2) : '$0.00'}</td>
+          <td style="color:var(--text-muted)">${fmtDateShort(c.created_at)}</td>
+          <td>
+            <div class="table-actions">
+              <button class="btn btn-secondary btn-sm" onclick="editClient(${c.id}, ${JSON.stringify(c).replace(/"/g,'&quot;')})">✏️ Edit</button>
+              <button class="btn btn-danger btn-sm" onclick="deleteClient(${c.id}, '${escHtml(c.name)}')">🗑️</button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  } catch (err) {
+    toast('Failed to load clients: ' + err.message, 'error');
+  }
+}
+
+function editClient(id, data) {
+  document.getElementById('edit-client-id').value = id;
+  document.getElementById('edit-client-name').value = data.name || '';
+  document.getElementById('edit-client-company').value = data.company_name || '';
+  document.getElementById('edit-client-retell').value = data.retell_api_key || '';
+  document.getElementById('edit-client-twilio-sid').value = data.twilio_account_sid || '';
+  document.getElementById('edit-client-password').value = '';
+  document.getElementById('edit-client-twilio-token').value = '';
+  openModal('edit-client-modal');
+}
+
+async function deleteClient(id, name) {
+  if (!confirm(`Delete client "${name}"? This cannot be undone.`)) return;
+  try {
+    await apiDelete(`/clients/${id}`);
+    toast('Client deleted', 'success');
+    loadClients();
+  } catch (err) {
+    toast('Delete failed: ' + err.message, 'error');
+  }
+}
+
+function bindEvents() {
+  document.getElementById('add-client-btn')?.addEventListener('click', () => openModal('add-client-modal'));
+
+  document.getElementById('save-client-btn')?.addEventListener('click', async () => {
+    const name = document.getElementById('new-client-name').value.trim();
+    const email = document.getElementById('new-client-email').value.trim();
+    const password = document.getElementById('new-client-password').value;
+    if (!name || !email || !password) { toast('Name, email and password required', 'warning'); return; }
+
+    try {
+      await apiPost('/clients', {
+        name, email, password,
+        company_name: document.getElementById('new-client-company').value,
+        retell_api_key: document.getElementById('new-client-retell').value,
+        twilio_account_sid: document.getElementById('new-client-twilio-sid').value,
+        twilio_auth_token: document.getElementById('new-client-twilio-token').value,
+      });
+      closeModal('add-client-modal');
+      document.querySelectorAll('#add-client-modal input').forEach(el => el.value = '');
+      toast('Client created', 'success');
+      loadClients();
+    } catch (err) {
+      toast('Failed: ' + err.message, 'error');
+    }
+  });
+
+  document.getElementById('update-client-btn')?.addEventListener('click', async () => {
+    const id = document.getElementById('edit-client-id').value;
+    try {
+      await apiPut(`/clients/${id}`, {
+        name: document.getElementById('edit-client-name').value,
+        company_name: document.getElementById('edit-client-company').value,
+        retell_api_key: document.getElementById('edit-client-retell').value,
+        twilio_account_sid: document.getElementById('edit-client-twilio-sid').value,
+        twilio_auth_token: document.getElementById('edit-client-twilio-token').value,
+        password: document.getElementById('edit-client-password').value || undefined,
+      });
+      closeModal('edit-client-modal');
+      toast('Client updated', 'success');
+      loadClients();
+    } catch (err) {
+      toast('Update failed: ' + err.message, 'error');
+    }
+  });
+}
+</script>
+</body>
+</html>
