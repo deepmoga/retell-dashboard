@@ -105,4 +105,56 @@ function normalizeCallData(raw, userId) {
   };
 }
 
-module.exports = { listCalls, getCall, createOutboundCall, listAgents, listPhoneNumbers, normalizeCallData };
+async function listVoices(apiKey) {
+  const client = retellClient(apiKey);
+  const response = await client.get('/v2/list-voices');
+  return response.data;
+}
+
+async function getAgent(apiKey, agentId) {
+  const client = retellClient(apiKey);
+  const response = await client.get(`/v2/get-agent/${agentId}`);
+  return response.data;
+}
+
+async function createAgent(apiKey, config) {
+  const client = retellClient(apiKey);
+  const response = await client.post('/v2/create-agent', config);
+  return response.data;
+}
+
+async function updateAgent(apiKey, agentId, config) {
+  const client = retellClient(apiKey);
+  const response = await client.patch(`/v2/update-agent/${agentId}`, config);
+  return response.data;
+}
+
+async function deleteAgent(apiKey, agentId) {
+  const client = retellClient(apiKey);
+  await client.delete(`/v2/delete-agent/${agentId}`);
+  return true;
+}
+
+async function createRetellLLM(apiKey, config) {
+  const client = retellClient(apiKey);
+  const response = await client.post('/v2/create-retell-llm', config);
+  return response.data;
+}
+
+async function updateRetellLLM(apiKey, llmId, config) {
+  const client = retellClient(apiKey);
+  const response = await client.patch(`/v2/update-retell-llm/${llmId}`, config);
+  return response.data;
+}
+
+async function getRetellLLM(apiKey, llmId) {
+  const client = retellClient(apiKey);
+  const response = await client.get(`/v2/get-retell-llm/${llmId}`);
+  return response.data;
+}
+
+module.exports = {
+  listCalls, getCall, createOutboundCall, listAgents, listPhoneNumbers, normalizeCallData,
+  listVoices, getAgent, createAgent, updateAgent, deleteAgent,
+  createRetellLLM, updateRetellLLM, getRetellLLM,
+};

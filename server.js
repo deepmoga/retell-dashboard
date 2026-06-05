@@ -17,6 +17,7 @@ const costRoutes = require('./routes/costs');
 const liveRoutes = require('./routes/live');
 const clientRoutes = require('./routes/clients');
 const appointmentRoutes = require('./routes/appointments');
+const agentRoutes = require('./routes/agents');
 
 // --- Init ---
 initDatabase();
@@ -60,6 +61,7 @@ app.use('/api/costs', costRoutes);
 app.use('/api/live', liveRoutes);
 app.use('/api/clients', clientRoutes);
 app.use('/api/appointments', appointmentRoutes);
+app.use('/api/agents', agentRoutes);
 
 // Dashboard stats endpoint
 const authMiddleware = require('./middleware/auth');
@@ -81,7 +83,7 @@ app.use('/webhook/retell', webhookRouter);
 app.use('/webhook/vapi', vapiWebhookRouter);
 
 // --- SPA fallback for HTML pages ---
-const pages = ['dashboard', 'calls', 'live', 'leads', 'costs', 'clients', 'settings', 'appointments'];
+const pages = ['dashboard', 'calls', 'live', 'leads', 'costs', 'clients', 'settings', 'appointments', 'agents'];
 pages.forEach(page => {
   app.get(`/${page}`, (req, res) => {
     res.sendFile(path.join(__dirname, 'public', `${page}.html`));

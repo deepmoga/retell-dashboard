@@ -1,14 +1,81 @@
 let costChart = null;
+let selectedClientId = '';
 
 document.addEventListener('DOMContentLoaded', async () => {
   if (!requireAuth()) return;
+  const user = getUser();
+  if (user?.role === 'admin') {
+    document.getElementById('admin-client-bar').style.display = '';
+    await loadClientList();
+  }
   await Promise.all([loadSummary(), loadDaily()]);
   bindBudget();
 });
 
+async function loadClientList() {
+  try {
+    const data = await apiGet('/clients');
+    const sel = document.getElementById('client-selector');
+    (data.clients || []).forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = (c.company_name || c.name) + ' — ' + c.email;
+      sel.appendChild(opt);
+    });
+    await loadClientOverview();
+  } catch (_) {}
+}
+
+async function loadClientOverview() {
+  try {
+    const data = await apiGet('/costs/by-client');
+    const tbody = document.getElementById('client-overview-tbody');
+    const clients = data.clients || [];
+    if (!clients.length) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text-muted)">No client data yet</td></tr>';
+      return;
+    }
+    tbody.innerHTML = clients.map(c => `
+      <tr>
+        <td><strong>${escHtml(c.name)}</strong></td>
+        <td>${escHtml(c.company_name || '—')}</td>
+        <td>${c.total_calls || 0}</td>
+        <td style="font-weight:600;color:var(--accent)">$${parseFloat(c.total_cost || 0).toFixed(2)}</td>
+        <td><button class="btn btn-secondary btn-sm" onclick="viewClientCosts(${c.id},'${escHtml(c.company_name || c.name)}')">View Details</button></td>
+      </tr>`).join('');
+  } catch (_) {}
+}
+
+function viewClientCosts(clientId, clientName) {
+  const sel = document.getElementById('client-selector');
+  sel.value = clientId;
+  onClientChange();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+async function onClientChange() {
+  selectedClientId = document.getElementById('client-selector').value;
+  const overview = document.getElementById('client-overview');
+  const info = document.getElementById('selected-client-info');
+
+  if (!selectedClientId) {
+    overview.style.display = '';
+    info.textContent = '';
+    await Promise.all([loadSummary(), loadDaily()]);
+    return;
+  }
+
+  overview.style.display = 'none';
+  const sel = document.getElementById('client-selector');
+  const label = sel.options[sel.selectedIndex]?.textContent || '';
+  info.textContent = 'Showing individual client breakdown';
+  await Promise.all([loadSummary(), loadDaily()]);
+}
+
 async function loadSummary() {
   try {
-    const data = await apiGet('/costs/summary');
+    const qs = selectedClientId ? `?client_id=${selectedClientId}` : '';
+    const data = await apiGet('/costs/summary' + qs);
     const s = data.summary;
     setText('cost-total', '$' + parseFloat(s.total_cost || 0).toFixed(2));
     setText('cost-retell', '$' + parseFloat(s.retell_cost || 0).toFixed(2));
@@ -18,8 +85,15 @@ async function loadSummary() {
     const perCall = s.total_calls > 0 ? (s.total_cost / s.total_calls) : 0;
     setText('cost-per-call', '$' + perCall.toFixed(4));
 
-    const budget = parseFloat(localStorage.getItem('monthly_budget') || 0);
+    const budgetKey = selectedClientId ? `monthly_budget_client_${selectedClientId}` : 'monthly_budget';
+    const budget = parseFloat(localStorage.getItem(budgetKey) || 0);
     if (budget > 0) updateBudgetProgress(s.total_cost || 0, budget);
+    else {
+      const fill = document.getElementById('budget-fill');
+      const label = document.getElementById('budget-label');
+      if (fill) fill.style.width = '0%';
+      if (label) label.textContent = 'No budget set';
+    }
   } catch (err) {
     toast('Failed to load cost summary', 'error');
   }
@@ -27,7 +101,8 @@ async function loadSummary() {
 
 async function loadDaily() {
   try {
-    const data = await apiGet('/costs/daily?days=30');
+    const qs = selectedClientId ? `?client_id=${selectedClientId}&days=30` : '?days=30';
+    const data = await apiGet('/costs/daily' + qs);
     const daily = data.daily || [];
     renderTable(daily);
     renderChart(daily);
@@ -44,14 +119,11 @@ function setText(id, val) {
 function renderTable(daily) {
   const tbody = document.getElementById('costs-tbody');
   if (!tbody) return;
-
   const sorted = daily.slice().sort((a, b) => b.date.localeCompare(a.date));
-
   if (!sorted.length) {
     tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--text-muted)">No cost data yet</td></tr>';
     return;
   }
-
   const totals = sorted.reduce((acc, d) => ({
     calls: acc.calls + (d.total_calls || 0),
     minutes: acc.minutes + (d.total_minutes || 0),
@@ -70,8 +142,7 @@ function renderTable(daily) {
       <td>$${parseFloat(d.twilio_cost || 0).toFixed(4)}</td>
       <td>$${parseFloat(d.llm_cost || 0).toFixed(4)}</td>
       <td style="font-weight:600">$${parseFloat(d.total_cost || 0).toFixed(4)}</td>
-    </tr>
-  `).join('');
+    </tr>`).join('');
 
   const totalRow = `
     <tr style="background:var(--surface2);font-weight:600;border-top:2px solid var(--border2)">
@@ -82,8 +153,7 @@ function renderTable(daily) {
       <td>$${totals.twilio.toFixed(4)}</td>
       <td>$${totals.llm.toFixed(4)}</td>
       <td>$${totals.total.toFixed(4)}</td>
-    </tr>
-  `;
+    </tr>`;
 
   tbody.innerHTML = rows + totalRow;
 }
@@ -91,9 +161,7 @@ function renderTable(daily) {
 function renderChart(daily) {
   const ctx = document.getElementById('cost-chart');
   if (!ctx) return;
-
   const sorted = daily.slice().sort((a, b) => a.date.localeCompare(b.date));
-
   if (costChart) costChart.destroy();
   costChart = new Chart(ctx, {
     type: 'bar',
@@ -118,14 +186,17 @@ function renderChart(daily) {
 
 function bindBudget() {
   const input = document.getElementById('budget-input');
-  const saved = localStorage.getItem('monthly_budget');
+  const budgetKey = selectedClientId ? `monthly_budget_client_${selectedClientId}` : 'monthly_budget';
+  const saved = localStorage.getItem(budgetKey);
   if (saved && input) input.value = saved;
 
   document.getElementById('save-budget')?.addEventListener('click', async () => {
     const val = parseFloat(input?.value || 0);
     if (isNaN(val) || val < 0) { toast('Invalid budget amount', 'warning'); return; }
-    localStorage.setItem('monthly_budget', val);
-    const data = await apiGet('/costs/summary').catch(() => null);
+    const key = selectedClientId ? `monthly_budget_client_${selectedClientId}` : 'monthly_budget';
+    localStorage.setItem(key, val);
+    const qs = selectedClientId ? `?client_id=${selectedClientId}` : '';
+    const data = await apiGet('/costs/summary' + qs).catch(() => null);
     if (data) updateBudgetProgress(data.summary?.total_cost || 0, val);
     toast('Budget saved', 'success');
   });
@@ -136,7 +207,6 @@ function updateBudgetProgress(current, budget) {
   const fill = document.getElementById('budget-fill');
   const label = document.getElementById('budget-label');
   const warn = document.getElementById('budget-warning');
-
   if (fill) {
     fill.style.width = pct + '%';
     fill.className = 'progress-fill' + (pct >= 100 ? ' danger' : pct >= 80 ? ' warning' : '');
