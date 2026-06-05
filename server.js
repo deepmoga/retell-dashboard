@@ -8,6 +8,7 @@ const path = require('path');
 const { initDatabase, seedAdmin } = require('./database/db');
 const { startSyncJob, setSocketIO: setSyncSocketIO } = require('./services/sync');
 const { router: webhookRouter, setSocketIO: setWebhookSocketIO } = require('./webhooks/retell');
+const { router: vapiWebhookRouter, setSocketIO: setVapiWebhookSocketIO } = require('./webhooks/vapi');
 
 const authRoutes = require('./routes/auth');
 const callRoutes = require('./routes/calls');
@@ -29,6 +30,7 @@ const io = new Server(server, {
 // Pass io to services
 setSyncSocketIO(io);
 setWebhookSocketIO(io);
+setVapiWebhookSocketIO(io);
 
 // --- Middleware ---
 app.use(cors());
@@ -72,8 +74,9 @@ app.get('/api/dashboard/stats', authMiddleware, (req, res) => {
   }
 });
 
-// Webhook (no auth)
+// Webhooks (no auth)
 app.use('/webhook/retell', webhookRouter);
+app.use('/webhook/vapi', vapiWebhookRouter);
 
 // --- SPA fallback for HTML pages ---
 const pages = ['dashboard', 'calls', 'live', 'leads', 'costs', 'clients', 'settings'];

@@ -3,7 +3,8 @@ const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 const { userQueries, callQueries, upsertDailyCost } = require('../database/db');
-const { listCalls, normalizeCallData } = require('./retell');
+const { listCalls: retellListCalls, normalizeCallData: retellNormalize } = require('./retell');
+const { listCalls: vapiListCalls, normalizeCallData: vapiNormalize } = require('./vapi');
 
 let ioInstance = null;
 
@@ -38,47 +39,42 @@ async function downloadRecording(callId, recordingUrl) {
   }
 }
 
-async function syncUserCalls(user) {
-  if (!user.retell_api_key) return;
-
+async function syncProviderCalls(user, provider) {
   try {
-    console.log(`[Sync] Syncing calls for user ${user.id}...`);
-    const data = await listCalls(user.retell_api_key, { limit: 100 });
-    const calls = Array.isArray(data) ? data : (data.call_list || data.calls || []);
+    let calls = [];
 
-    for (const rawCall of calls) {
-      const normalized = normalizeCallData(rawCall, user.id);
+    if (provider === 'retell' && user.retell_api_key) {
+      const data = await retellListCalls(user.retell_api_key, { limit: 100 });
+      const raw = Array.isArray(data) ? data : (data.call_list || data.calls || []);
+      calls = raw.map(c => retellNormalize(c, user.id));
+    } else if (provider === 'vapi' && user.vapi_api_key) {
+      const raw = await vapiListCalls(user.vapi_api_key, { limit: 100 });
+      calls = raw.map(c => vapiNormalize(c, user.id));
+    }
+
+    for (const normalized of calls) {
       callQueries.upsert.run(normalized);
 
-      // Download recording if not saved locally
       if (normalized.recording_url && normalized.status === 'ended') {
         const existing = callQueries.findByCallId.get(normalized.call_id);
         if (existing && !existing.recording_local_path) {
           const localPath = await downloadRecording(normalized.call_id, normalized.recording_url);
-          if (localPath) {
-            callQueries.updateRecordingPath.run(localPath, normalized.call_id);
-          }
+          if (localPath) callQueries.updateRecordingPath.run(localPath, normalized.call_id);
         }
-      }
-
-      // Update daily cost aggregates
-      if (normalized.status === 'ended' && normalized.start_timestamp) {
-        const dateStr = new Date(normalized.start_timestamp).toISOString().slice(0, 10);
-        upsertDailyCost(user.id, dateStr, {
-          calls: 0, // avoid double counting — handled separately
-          minutes: normalized.duration_seconds / 60,
-          retell: 0,
-          twilio: 0,
-          llm: 0,
-          total: 0,
-        });
       }
     }
 
-    console.log(`[Sync] Processed ${calls.length} calls for user ${user.id}`);
+    if (calls.length > 0) {
+      console.log(`[Sync] ${provider.toUpperCase()}: ${calls.length} calls for user ${user.id}`);
+    }
   } catch (err) {
-    console.error(`[Sync] Error syncing user ${user.id}:`, err.message);
+    console.error(`[Sync] ${provider} error for user ${user.id}:`, err.message);
   }
+}
+
+async function syncUserCalls(user) {
+  await syncProviderCalls(user, 'retell');
+  await syncProviderCalls(user, 'vapi');
 }
 
 async function syncAllCalls() {

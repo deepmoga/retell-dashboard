@@ -3,7 +3,8 @@ const multer = require('multer');
 const { parse } = require('csv-parse/sync');
 const fs = require('fs');
 const { leadQueries, userQueries } = require('../database/db');
-const { createOutboundCall, listAgents, listPhoneNumbers } = require('../services/retell');
+const { createOutboundCall: retellOutboundCall, listAgents: retellListAgents, listPhoneNumbers: retellListNumbers } = require('../services/retell');
+const { createOutboundCall: vapiOutboundCall, listAssistants: vapiListAssistants, listPhoneNumbers: vapiListNumbers } = require('../services/vapi');
 const authMiddleware = require('../middleware/auth');
 
 const router = express.Router();
@@ -166,13 +167,27 @@ router.post('/:id/call', async (req, res) => {
       return res.status(400).json({ error: 'agent_id and from_number required' });
     }
 
-    const result = await createOutboundCall(
-      actualUser.retell_api_key,
-      from_number,
-      lead.phone,
-      agent_id,
-      { lead_name: lead.name || '', lead_city: lead.city || '' }
-    );
+    // Detect provider from agent_id prefix or request body
+    const provider = req.body.provider || (agent_id.includes('-') && agent_id.length === 36 ? 'vapi' : 'retell');
+    let result;
+
+    if (provider === 'vapi' && actualUser.vapi_api_key) {
+      result = await vapiOutboundCall(
+        actualUser.vapi_api_key,
+        from_number,   // phoneNumberId for VAPI
+        lead.phone,
+        agent_id,
+        { lead_name: lead.name || '', lead_city: lead.city || '' }
+      );
+    } else {
+      result = await retellOutboundCall(
+        actualUser.retell_api_key,
+        from_number,
+        lead.phone,
+        agent_id,
+        { lead_name: lead.name || '', lead_city: lead.city || '' }
+      );
+    }
 
     leadQueries.updateStatus.run('called', new Date().toISOString(), lead.id);
     res.json({ success: true, call_id: result.call_id });
@@ -223,9 +238,27 @@ router.get('/agents', async (req, res) => {
   try {
     const userId = req.user.userId;
     const user = require('../database/db').db.prepare('SELECT * FROM users WHERE id=?').get(userId);
-    if (!user?.retell_api_key) return res.json({ agents: [] });
-    const agents = await listAgents(user.retell_api_key);
-    res.json({ agents: Array.isArray(agents) ? agents : [] });
+    let agents = [];
+
+    // Retell agents
+    if (user?.retell_api_key) {
+      const ra = await retellListAgents(user.retell_api_key).catch(() => []);
+      const retellAgents = (Array.isArray(ra) ? ra : []).map(a => ({
+        id: a.agent_id, name: a.agent_name, provider: 'retell',
+      }));
+      agents = agents.concat(retellAgents);
+    }
+
+    // VAPI assistants
+    if (user?.vapi_api_key) {
+      const va = await vapiListAssistants(user.vapi_api_key).catch(() => []);
+      const vapiAgents = (Array.isArray(va) ? va : []).map(a => ({
+        id: a.id, name: a.name || 'VAPI Assistant', provider: 'vapi',
+      }));
+      agents = agents.concat(vapiAgents);
+    }
+
+    res.json({ agents });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch agents' });
   }
@@ -235,9 +268,27 @@ router.get('/phone-numbers', async (req, res) => {
   try {
     const userId = req.user.userId;
     const user = require('../database/db').db.prepare('SELECT * FROM users WHERE id=?').get(userId);
-    if (!user?.retell_api_key) return res.json({ phone_numbers: [] });
-    const numbers = await listPhoneNumbers(user.retell_api_key);
-    res.json({ phone_numbers: Array.isArray(numbers) ? numbers : [] });
+    let numbers = [];
+
+    // Retell numbers
+    if (user?.retell_api_key) {
+      const rn = await retellListNumbers(user.retell_api_key).catch(() => []);
+      const retellNums = (Array.isArray(rn) ? rn : []).map(n => ({
+        number: n.phone_number, nickname: n.nickname || '', provider: 'retell', id: n.phone_number,
+      }));
+      numbers = numbers.concat(retellNums);
+    }
+
+    // VAPI numbers
+    if (user?.vapi_api_key) {
+      const vn = await vapiListNumbers(user.vapi_api_key).catch(() => []);
+      const vapiNums = (Array.isArray(vn) ? vn : []).map(n => ({
+        number: n.number, nickname: n.name || '', provider: 'vapi', id: n.id,
+      }));
+      numbers = numbers.concat(vapiNums);
+    }
+
+    res.json({ phone_numbers: numbers });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch phone numbers' });
   }

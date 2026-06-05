@@ -19,6 +19,7 @@ db.exec(`
     company_name TEXT,
     logo_url TEXT,
     retell_api_key TEXT,
+    vapi_api_key TEXT,
     twilio_account_sid TEXT,
     twilio_auth_token TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -86,8 +87,15 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_cost_daily_user_date ON cost_daily(user_id, date);
 `);
 
-// Called from server.js for logging purposes; tables already exist above
+// Called from server.js — also runs migrations
 function initDatabase() {
+  // Migration: add vapi_api_key column if it doesn't exist
+  try {
+    db.exec(`ALTER TABLE users ADD COLUMN vapi_api_key TEXT`);
+    console.log('[DB] Migration: added vapi_api_key column');
+  } catch (e) {
+    // Column already exists — ignore
+  }
   console.log('[DB] Database initialized at', DB_PATH);
 }
 
@@ -123,7 +131,7 @@ const userQueries = {
   `),
   updatePassword: db.prepare('UPDATE users SET password=? WHERE id=?'),
   delete: db.prepare('DELETE FROM users WHERE id=?'),
-  getApiKeys: db.prepare("SELECT id, retell_api_key, twilio_account_sid, twilio_auth_token FROM users WHERE retell_api_key IS NOT NULL AND retell_api_key != ''"),
+  getApiKeys: db.prepare("SELECT id, retell_api_key, vapi_api_key, twilio_account_sid, twilio_auth_token FROM users WHERE (retell_api_key IS NOT NULL AND retell_api_key != '') OR (vapi_api_key IS NOT NULL AND vapi_api_key != '')"),
 };
 
 // --- Call queries ---

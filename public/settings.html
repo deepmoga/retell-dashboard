@@ -72,6 +72,25 @@
             </div>
           </div>
 
+          <!-- VAPI -->
+          <div style="margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid var(--border)">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+              <span style="font-size:18px">🎙️</span>
+              <span style="font-weight:600">VAPI</span>
+              <span id="vapi-status" style="font-size:11px;padding:2px 8px;border-radius:10px;background:var(--surface2);color:var(--text-muted)">Not set</span>
+            </div>
+            <div class="form-group">
+              <label class="form-label">VAPI API Key</label>
+              <div style="display:flex;gap:8px">
+                <input type="password" id="vapi-api-key" class="form-control" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+                <button class="btn btn-ghost btn-sm" onclick="toggleVisible('vapi-api-key')">👁</button>
+              </div>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
+                dashboard.vapi.ai → Account → API Keys → Copy
+              </div>
+            </div>
+          </div>
+
           <!-- Twilio -->
           <div>
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
@@ -167,6 +186,10 @@ async function loadProfile() {
       document.getElementById('retell-api-key').value = u.retell_api_key;
       setStatus('retell-status', '✓ Set', 'var(--accent)');
     }
+    if (u.vapi_api_key) {
+      document.getElementById('vapi-api-key').value = u.vapi_api_key;
+      setStatus('vapi-status', '✓ Set', 'var(--accent)');
+    }
     if (u.twilio_account_sid) {
       document.getElementById('twilio-sid').value = u.twilio_account_sid;
       setStatus('twilio-status', '✓ Set', 'var(--accent)');
@@ -190,10 +213,11 @@ function bindEvents() {
   // Save API Keys
   document.getElementById('save-keys-btn').addEventListener('click', async () => {
     const retell = document.getElementById('retell-api-key').value.trim();
+    const vapi = document.getElementById('vapi-api-key').value.trim();
     const sid = document.getElementById('twilio-sid').value.trim();
     const token = document.getElementById('twilio-token').value.trim();
 
-    if (!retell && !sid) {
+    if (!retell && !vapi && !sid) {
       toast('Kam az kam ek key daalo', 'warning');
       return;
     }
@@ -204,11 +228,13 @@ function bindEvents() {
     try {
       await apiPut('/auth/profile', {
         retell_api_key: retell,
+        vapi_api_key: vapi,
         twilio_account_sid: sid,
         twilio_auth_token: token,
       });
 
       if (retell) setStatus('retell-status', '✓ Set', 'var(--accent)');
+      if (vapi) setStatus('vapi-status', '✓ Set', 'var(--accent)');
       if (sid) setStatus('twilio-status', '✓ Set', 'var(--accent)');
       toast('✅ API Keys saved to database!', 'success');
     } catch (err) {
