@@ -94,4 +94,31 @@ function normalizeCallData(raw, userId) {
   };
 }
 
-module.exports = { listCalls, getCall, createOutboundCall, listAssistants, listPhoneNumbers, normalizeCallData };
+async function getAssistant(apiKey, id) {
+  const client = vapiClient(apiKey);
+  const response = await client.get(`/assistant/${id}`);
+  return response.data;
+}
+
+async function createAssistant(apiKey, config) {
+  const client = vapiClient(apiKey);
+  const response = await client.post('/assistant', config);
+  return response.data;
+}
+
+async function updateAssistant(apiKey, id, config) {
+  const client = vapiClient(apiKey);
+  const response = await client.patch(`/assistant/${id}`, config);
+  return response.data;
+}
+
+async function deleteAssistant(apiKey, id) {
+  const client = vapiClient(apiKey);
+  await client.delete(`/assistant/${id}`);
+  return true;
+}
+
+module.exports = {
+  listCalls, getCall, createOutboundCall, listAssistants, listPhoneNumbers, normalizeCallData,
+  getAssistant, createAssistant, updateAssistant, deleteAssistant,
+};

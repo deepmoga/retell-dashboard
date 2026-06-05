@@ -45,10 +45,14 @@ jobs:
             pm2 delete retell-dashboard || true
 
             echo ">>> Starting fresh with correct node args..."
-            pm2 start server.js --name retell-dashboard --node-args="--experimental-sqlite" --wait-ready --listen-timeout 10000
+            pm2 start server.js --name retell-dashboard --node-args="--experimental-sqlite"
+            sleep 3
             pm2 save
 
             echo ">>> PM2 Status:"
             pm2 list
+
+            echo ">>> Testing API route locally:"
+            curl -s -o /dev/null -w "GET /api/agents HTTP status: %{http_code}\n" http://localhost:3000/api/agents || echo "curl failed"
 
             echo ">>> Deploy complete! Site: https://calling.officialdigitalmarketing.in"

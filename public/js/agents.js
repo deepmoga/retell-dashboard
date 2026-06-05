@@ -1,7 +1,30 @@
-let allVoices = [];
 let editingAgentId = null;
-let editingLlmId = null;
 let deleteAgentId = null;
+
+const VAPI_VOICES = [
+  { provider: '11labs', voiceId: 'paula',   name: 'Paula',   gender: 'female' },
+  { provider: '11labs', voiceId: 'rachel',  name: 'Rachel',  gender: 'female' },
+  { provider: '11labs', voiceId: 'lily',    name: 'Lily',    gender: 'female' },
+  { provider: '11labs', voiceId: 'sarah',   name: 'Sarah',   gender: 'female' },
+  { provider: '11labs', voiceId: 'alice',   name: 'Alice',   gender: 'female' },
+  { provider: '11labs', voiceId: 'jessica', name: 'Jessica', gender: 'female' },
+  { provider: '11labs', voiceId: 'adam',    name: 'Adam',    gender: 'male'   },
+  { provider: '11labs', voiceId: 'charlie', name: 'Charlie', gender: 'male'   },
+  { provider: '11labs', voiceId: 'james',   name: 'James',   gender: 'male'   },
+  { provider: '11labs', voiceId: 'george',  name: 'George',  gender: 'male'   },
+  { provider: '11labs', voiceId: 'brian',   name: 'Brian',   gender: 'male'   },
+  { provider: '11labs', voiceId: 'liam',    name: 'Liam',    gender: 'male'   },
+  { provider: 'openai', voiceId: 'alloy',   name: 'Alloy',   gender: 'neutral' },
+  { provider: 'openai', voiceId: 'echo',    name: 'Echo',    gender: 'male'   },
+  { provider: 'openai', voiceId: 'fable',   name: 'Fable',   gender: 'female' },
+  { provider: 'openai', voiceId: 'onyx',    name: 'Onyx',    gender: 'male'   },
+  { provider: 'openai', voiceId: 'nova',    name: 'Nova',    gender: 'female' },
+  { provider: 'openai', voiceId: 'shimmer', name: 'Shimmer', gender: 'female' },
+  { provider: 'azure',  voiceId: 'en-US-JennyNeural',   name: 'Jenny (US)',    gender: 'female' },
+  { provider: 'azure',  voiceId: 'en-AU-NatashaNeural',  name: 'Natasha (AU)',  gender: 'female' },
+  { provider: 'azure',  voiceId: 'en-GB-SoniaNeural',    name: 'Sonia (GB)',    gender: 'female' },
+  { provider: 'azure',  voiceId: 'en-IN-NeerjaNeural',   name: 'Neerja (IN)',   gender: 'female' },
+];
 
 const TEMPLATES = {
   sales: `You are a professional sales agent for [Company Name]. Your goal is to qualify leads and schedule product demonstrations.
@@ -13,9 +36,9 @@ When speaking with prospects:
 - Address objections confidently and empathetically
 - Guide qualified leads toward booking a demo
 
-Keep conversations focused, friendly, and under 5 minutes. Always confirm the prospect's availability before suggesting demo times.`,
+Keep conversations focused, friendly, and under 5 minutes.`,
 
-  support: `You are a helpful customer support agent for [Company Name]. You help customers resolve issues quickly and leave them satisfied.
+  support: `You are a helpful customer support agent for [Company Name]. You help customers resolve issues quickly.
 
 Your approach:
 - Greet warmly and identify the customer's issue
@@ -24,35 +47,35 @@ Your approach:
 - Confirm the issue is resolved before ending the call
 - Escalate to a human agent if the issue is complex
 
-Always be patient, empathetic, and professional. Never make promises you cannot keep.`,
+Always be patient, empathetic, and professional.`,
 
   booking: `You are a booking assistant for [Business Name]. You help customers schedule appointments efficiently.
 
 During the call:
 - Confirm the service they need
 - Check their preferred date and time
-- Verify availability and offer alternatives if needed
-- Collect required details: name, phone number, and any special requests
+- Collect required details: name, phone number, any special requests
 - Confirm the booking and provide a reference number
 
-Always double-check appointment details before confirming. If a slot is unavailable, proactively suggest the nearest available alternatives.`,
+Always double-check appointment details before confirming.`,
 
   survey: `You are a survey agent conducting customer satisfaction research for [Company Name].
 
 Your process:
 - Introduce yourself and explain the survey takes 2-3 minutes
 - Ask each question clearly and wait for a complete response
-- Probe for more detail when answers are vague
-- Thank participants for their time and honesty
-- Keep a neutral, friendly tone throughout
+- Thank participants for their time
 
-Do not lead respondents toward any particular answer. Record responses accurately and objectively.`,
+Keep a neutral, friendly tone throughout.`,
 };
+
+let allVoices = [...VAPI_VOICES];
+let filteredVoices = [...VAPI_VOICES];
 
 document.addEventListener('DOMContentLoaded', async () => {
   if (!requireAuth()) return;
+  renderVoices(allVoices);
   await loadAgents();
-  await loadVoices();
 
   document.getElementById('new-agent-btn').addEventListener('click', openNewAgentModal);
   document.getElementById('save-agent-btn').addEventListener('click', saveAgent);
@@ -80,16 +103,6 @@ async function loadAgents() {
   }
 }
 
-async function loadVoices() {
-  try {
-    const data = await apiGet('/agents/voices');
-    allVoices = data.voices || [];
-    renderVoices(allVoices);
-  } catch (_) {
-    document.getElementById('voice-grid').innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--text-muted)">Could not load voices</div>';
-  }
-}
-
 function renderAgents(agents) {
   const container = document.getElementById('agents-container');
   if (!agents.length) {
@@ -104,25 +117,24 @@ function renderAgents(agents) {
   }
 
   const cards = agents.map(a => {
-    const prompt = a.llm?.system_prompt || a.response_engine?.system_prompt || '';
-    const voice = a.voice_id || 'Unknown voice';
-    const lang = a.language || 'en-US';
+    const prompt = a.model?.systemPrompt || a.model?.messages?.[0]?.content || '';
+    const voiceInfo = a.voice ? `${a.voice.provider || '11labs'} · ${a.voice.voiceId || '—'}` : 'No voice set';
     return `
       <div class="agent-card">
         <div class="agent-card-header">
           <div class="agent-avatar">🤖</div>
           <div style="flex:1;min-width:0">
-            <div class="agent-name">${escHtml(a.agent_name || 'Unnamed Agent')}</div>
-            <div class="agent-meta">${escHtml(voice)} · ${escHtml(lang)}</div>
+            <div class="agent-name">${escHtml(a.name || 'Unnamed Agent')}</div>
+            <div class="agent-meta">${escHtml(voiceInfo)} · ${escHtml(a.language || 'en-US')}</div>
           </div>
-          <div>
-            <span class="badge badge-ended" style="font-size:10px">Active</span>
-          </div>
+          <span class="badge badge-ended" style="font-size:10px">Active</span>
         </div>
-        ${prompt ? `<div class="agent-prompt-preview">${escHtml(prompt)}</div>` : '<div class="agent-prompt-preview" style="color:var(--text-dim)">No system prompt configured</div>'}
+        ${prompt
+          ? `<div class="agent-prompt-preview">${escHtml(prompt)}</div>`
+          : '<div class="agent-prompt-preview" style="color:var(--text-dim)">No system prompt configured</div>'}
         <div class="agent-card-actions">
-          <button class="btn btn-secondary btn-sm" style="flex:1" onclick="openEditAgentModal('${escHtml(a.agent_id)}')">✏️ Edit</button>
-          <button class="btn btn-danger btn-sm" onclick="openDeleteModal('${escHtml(a.agent_id)}','${escHtml(a.agent_name || 'this agent')}')">🗑</button>
+          <button class="btn btn-secondary btn-sm" style="flex:1" onclick="openEditAgentModal('${escHtml(a.id)}')">✏️ Edit</button>
+          <button class="btn btn-danger btn-sm" onclick="openDeleteModal('${escHtml(a.id)}','${escHtml(a.name || 'this agent')}')">🗑</button>
         </div>
       </div>`;
   });
@@ -139,42 +151,39 @@ function renderAgents(agents) {
 function renderVoices(voices) {
   const grid = document.getElementById('voice-grid');
   if (!voices.length) {
-    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--text-muted)">No voices available</div>';
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--text-muted)">No voices found</div>';
     return;
   }
+  const selProvider = document.getElementById('f-voice-provider')?.value || '';
+  const selVoiceId = document.getElementById('f-voice-id')?.value || '';
+
   grid.innerHTML = voices.map(v => {
     const gender = v.gender === 'female' ? '👩' : v.gender === 'male' ? '👨' : '🎙️';
-    const provider = v.provider || (v.voice_id?.split('-')[0] || 'Unknown');
+    const isSelected = selProvider === v.provider && selVoiceId === v.voiceId;
     return `
-      <div class="voice-card" id="vc-${escHtml(v.voice_id)}" onclick="selectVoice('${escHtml(v.voice_id)}','${escHtml(v.voice_name || v.voice_id)}')">
+      <div class="voice-card ${isSelected ? 'selected' : ''}"
+           id="vc-${escHtml(v.provider)}-${escHtml(v.voiceId)}"
+           onclick="selectVoice('${escHtml(v.provider)}','${escHtml(v.voiceId)}','${escHtml(v.name)}')">
         <div class="voice-gender">${gender}</div>
-        <div class="voice-name">${escHtml(v.voice_name || v.voice_id)}</div>
-        <div class="voice-provider">${escHtml(provider)}</div>
+        <div class="voice-name">${escHtml(v.name)}</div>
+        <div class="voice-provider">${escHtml(v.provider)}</div>
       </div>`;
   }).join('');
 }
 
 function filterVoices(query) {
   const q = query.toLowerCase();
-  const filtered = q ? allVoices.filter(v =>
-    (v.voice_name || '').toLowerCase().includes(q) ||
-    (v.voice_id || '').toLowerCase().includes(q) ||
-    (v.provider || '').toLowerCase().includes(q)
-  ) : allVoices;
-  renderVoices(filtered);
-  const saved = document.getElementById('f-voice-id').value;
-  if (saved) {
-    const el = document.getElementById('vc-' + saved);
-    if (el) el.classList.add('selected');
-  }
+  filteredVoices = q
+    ? allVoices.filter(v => v.name.toLowerCase().includes(q) || v.provider.toLowerCase().includes(q))
+    : [...allVoices];
+  renderVoices(filteredVoices);
 }
 
-function selectVoice(id, name) {
-  document.querySelectorAll('.voice-card').forEach(c => c.classList.remove('selected'));
-  const el = document.getElementById('vc-' + id);
-  if (el) el.classList.add('selected');
-  document.getElementById('f-voice-id').value = id;
-  document.getElementById('voice-selected-label').textContent = name;
+function selectVoice(provider, voiceId, name) {
+  document.getElementById('f-voice-provider').value = provider;
+  document.getElementById('f-voice-id').value = voiceId;
+  document.getElementById('voice-selected-label').textContent = `${name} (${provider})`;
+  renderVoices(filteredVoices);
 }
 
 function switchTab(tabName) {
@@ -184,19 +193,15 @@ function switchTab(tabName) {
 
 function openNewAgentModal() {
   editingAgentId = null;
-  editingLlmId = null;
   document.getElementById('modal-title').textContent = 'New Agent';
   document.getElementById('f-name').value = '';
   document.getElementById('f-language').value = 'en-US';
   document.getElementById('f-begin-message').value = '';
   document.getElementById('f-system-prompt').value = '';
+  document.getElementById('f-voice-provider').value = '';
   document.getElementById('f-voice-id').value = '';
-  document.getElementById('voice-selected-label').textContent = 'None';
-  document.getElementById('f-responsiveness').value = 1;
-  document.getElementById('resp-val').textContent = '1.00';
-  document.getElementById('f-interruption').value = 1;
-  document.getElementById('intr-val').textContent = '1.00';
-  document.querySelectorAll('.voice-card').forEach(c => c.classList.remove('selected'));
+  document.getElementById('voice-selected-label').textContent = 'Paula (11labs)';
+  selectVoice('11labs', 'paula', 'Paula');
   switchTab('basic');
   openModal('agent-modal');
 }
@@ -206,33 +211,18 @@ async function openEditAgentModal(agentId) {
     toast('Loading agent...', 'info', 1500);
     const data = await apiGet('/agents/' + agentId);
     const a = data.agent;
-
     editingAgentId = agentId;
-    editingLlmId = a.llm?.llm_id || a.response_engine?.llm_id || null;
 
     document.getElementById('modal-title').textContent = 'Edit Agent';
-    document.getElementById('f-name').value = a.agent_name || '';
+    document.getElementById('f-name').value = a.name || '';
     document.getElementById('f-language').value = a.language || 'en-US';
-    document.getElementById('f-begin-message').value = a.llm?.begin_message || '';
-    document.getElementById('f-system-prompt').value = a.llm?.system_prompt || '';
+    document.getElementById('f-begin-message').value = a.firstMessage || '';
+    document.getElementById('f-system-prompt').value = a.model?.systemPrompt || '';
 
-    const voiceId = a.voice_id || '';
-    document.getElementById('f-voice-id').value = voiceId;
-
-    const voiceName = allVoices.find(v => v.voice_id === voiceId)?.voice_name || voiceId || 'None';
-    document.getElementById('voice-selected-label').textContent = voiceName || 'None';
-    document.querySelectorAll('.voice-card').forEach(c => c.classList.remove('selected'));
-    if (voiceId) {
-      const el = document.getElementById('vc-' + voiceId);
-      if (el) el.classList.add('selected');
-    }
-
-    const resp = a.responsiveness !== undefined ? a.responsiveness : 1;
-    const intr = a.interruption_sensitivity !== undefined ? a.interruption_sensitivity : 1;
-    document.getElementById('f-responsiveness').value = resp;
-    document.getElementById('resp-val').textContent = parseFloat(resp).toFixed(2);
-    document.getElementById('f-interruption').value = intr;
-    document.getElementById('intr-val').textContent = parseFloat(intr).toFixed(2);
+    const vp = a.voice?.provider || '11labs';
+    const vid = a.voice?.voiceId || 'paula';
+    const vname = allVoices.find(v => v.provider === vp && v.voiceId === vid)?.name || vid;
+    selectVoice(vp, vid, vname);
 
     switchTab('basic');
     openModal('agent-modal');
@@ -247,12 +237,11 @@ async function saveAgent() {
 
   const payload = {
     agent_name: name,
-    voice_id: document.getElementById('f-voice-id').value || '11labs-Adrian',
+    voice_provider: document.getElementById('f-voice-provider').value || '11labs',
+    voice_id: document.getElementById('f-voice-id').value || 'paula',
     language: document.getElementById('f-language').value,
-    begin_message: document.getElementById('f-begin-message').value.trim() || null,
+    first_message: document.getElementById('f-begin-message').value.trim(),
     system_prompt: document.getElementById('f-system-prompt').value.trim(),
-    responsiveness: parseFloat(document.getElementById('f-responsiveness').value),
-    interruption_sensitivity: parseFloat(document.getElementById('f-interruption').value),
   };
 
   const btn = document.getElementById('save-agent-btn');
@@ -261,7 +250,6 @@ async function saveAgent() {
 
   try {
     if (editingAgentId) {
-      payload.llm_id = editingLlmId;
       await apiPut('/agents/' + editingAgentId, payload);
       toast('Agent updated successfully', 'success');
     } else {
@@ -305,9 +293,5 @@ async function confirmDelete() {
 
 function insertTemplate(type) {
   const ta = document.getElementById('f-system-prompt');
-  if (ta) {
-    ta.value = TEMPLATES[type] || '';
-    ta.focus();
-    toast('Template inserted', 'success');
-  }
+  if (ta) { ta.value = TEMPLATES[type] || ''; ta.focus(); toast('Template inserted', 'success'); }
 }

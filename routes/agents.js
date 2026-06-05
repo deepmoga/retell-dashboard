@@ -1,33 +1,22 @@
 const express = require('express');
 const authMiddleware = require('../middleware/auth');
-const retell = require('../services/retell');
+const vapi = require('../services/vapi');
 const { userQueries } = require('../database/db');
 
 const router = express.Router();
 router.use(authMiddleware);
 
-function getRetellKey(req) {
+function getVapiKey(req) {
   const user = userQueries.findById.get(req.user.userId);
-  return user?.retell_api_key || '';
+  return user?.vapi_api_key || '';
 }
 
 router.get('/', async (req, res) => {
   try {
-    const apiKey = getRetellKey(req);
+    const apiKey = getVapiKey(req);
     if (!apiKey) return res.json({ agents: [], no_key: true });
-    const agents = await retell.listAgents(apiKey);
+    const agents = await vapi.listAssistants(apiKey);
     res.json({ agents: agents || [] });
-  } catch (err) {
-    res.status(500).json({ error: err.response?.data?.message || err.message });
-  }
-});
-
-router.get('/voices', async (req, res) => {
-  try {
-    const apiKey = getRetellKey(req);
-    if (!apiKey) return res.json({ voices: [] });
-    const voices = await retell.listVoices(apiKey);
-    res.json({ voices: voices || [] });
   } catch (err) {
     res.status(500).json({ error: err.response?.data?.message || err.message });
   }
@@ -35,13 +24,8 @@ router.get('/voices', async (req, res) => {
 
 router.get('/:id', async (req, res) => {
   try {
-    const apiKey = getRetellKey(req);
-    const agent = await retell.getAgent(apiKey, req.params.id);
-    if (agent.response_engine?.type === 'retell-llm' && agent.response_engine.llm_id) {
-      try {
-        agent.llm = await retell.getRetellLLM(apiKey, agent.response_engine.llm_id);
-      } catch (_) {}
-    }
+    const apiKey = getVapiKey(req);
+    const agent = await vapi.getAssistant(apiKey, req.params.id);
     res.json({ agent });
   } catch (err) {
     res.status(500).json({ error: err.response?.data?.message || err.message });
@@ -50,25 +34,28 @@ router.get('/:id', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const apiKey = getRetellKey(req);
-    if (!apiKey) return res.status(400).json({ error: 'No Retell API key configured. Add it in Settings.' });
+    const apiKey = getVapiKey(req);
+    if (!apiKey) return res.status(400).json({ error: 'No VAPI API key configured. Add it in Settings.' });
 
-    const { agent_name, voice_id, language, begin_message, system_prompt, responsiveness, interruption_sensitivity } = req.body;
+    const { agent_name, voice_provider, voice_id, language, first_message, system_prompt, responsiveness, interruption_sensitivity } = req.body;
 
-    const llmPayload = { model: 'gpt-4o-mini', system_prompt: system_prompt || '' };
-    if (begin_message) llmPayload.begin_message = begin_message;
-    const llm = await retell.createRetellLLM(apiKey, llmPayload);
-
-    const agentPayload = {
-      agent_name: agent_name || 'New Agent',
-      voice_id: voice_id || '11labs-Adrian',
+    const payload = {
+      name: agent_name || 'New Agent',
+      model: {
+        provider: 'openai',
+        model: 'gpt-4o-mini',
+        systemPrompt: system_prompt || '',
+      },
+      voice: {
+        provider: voice_provider || '11labs',
+        voiceId: voice_id || 'paula',
+      },
+      firstMessage: first_message || '',
       language: language || 'en-US',
-      response_engine: { type: 'retell-llm', llm_id: llm.llm_id },
-      responsiveness: responsiveness !== undefined ? parseFloat(responsiveness) : 1.0,
-      interruption_sensitivity: interruption_sensitivity !== undefined ? parseFloat(interruption_sensitivity) : 1.0,
+      backgroundDenoisingEnabled: true,
     };
 
-    const agent = await retell.createAgent(apiKey, agentPayload);
+    const agent = await vapi.createAssistant(apiKey, payload);
     res.json({ agent });
   } catch (err) {
     res.status(500).json({ error: err.response?.data?.message || err.message });
@@ -77,27 +64,19 @@ router.post('/', async (req, res) => {
 
 router.put('/:id', async (req, res) => {
   try {
-    const apiKey = getRetellKey(req);
-    const { agent_name, voice_id, language, begin_message, system_prompt, responsiveness, interruption_sensitivity, llm_id } = req.body;
+    const apiKey = getVapiKey(req);
+    const { agent_name, voice_provider, voice_id, language, first_message, system_prompt } = req.body;
 
-    const agentUpdate = {};
-    if (agent_name !== undefined) agentUpdate.agent_name = agent_name;
-    if (voice_id !== undefined) agentUpdate.voice_id = voice_id;
-    if (language !== undefined) agentUpdate.language = language;
-    if (responsiveness !== undefined) agentUpdate.responsiveness = parseFloat(responsiveness);
-    if (interruption_sensitivity !== undefined) agentUpdate.interruption_sensitivity = parseFloat(interruption_sensitivity);
-
-    if (Object.keys(agentUpdate).length > 0) {
-      await retell.updateAgent(apiKey, req.params.id, agentUpdate);
+    const payload = {};
+    if (agent_name !== undefined) payload.name = agent_name;
+    if (first_message !== undefined) payload.firstMessage = first_message;
+    if (language !== undefined) payload.language = language;
+    if (system_prompt !== undefined) payload.model = { provider: 'openai', model: 'gpt-4o-mini', systemPrompt: system_prompt };
+    if (voice_provider !== undefined || voice_id !== undefined) {
+      payload.voice = { provider: voice_provider || '11labs', voiceId: voice_id || 'paula' };
     }
 
-    if (llm_id && (system_prompt !== undefined || begin_message !== undefined)) {
-      const llmUpdate = {};
-      if (system_prompt !== undefined) llmUpdate.system_prompt = system_prompt;
-      if (begin_message !== undefined) llmUpdate.begin_message = begin_message;
-      await retell.updateRetellLLM(apiKey, llm_id, llmUpdate);
-    }
-
+    await vapi.updateAssistant(apiKey, req.params.id, payload);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.response?.data?.message || err.message });
@@ -106,8 +85,8 @@ router.put('/:id', async (req, res) => {
 
 router.delete('/:id', async (req, res) => {
   try {
-    const apiKey = getRetellKey(req);
-    await retell.deleteAgent(apiKey, req.params.id);
+    const apiKey = getVapiKey(req);
+    await vapi.deleteAssistant(apiKey, req.params.id);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.response?.data?.message || err.message });
