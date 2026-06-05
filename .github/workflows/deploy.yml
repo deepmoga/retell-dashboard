@@ -25,18 +25,20 @@ jobs:
             set -e
             cd /var/www/retell-dashboard
 
+            echo ">>> Current PM2 processes:"
+            pm2 list
+
             echo ">>> Pulling latest code..."
             git pull origin main
 
             echo ">>> Installing dependencies..."
             npm install --omit=dev
 
-            echo ">>> Restarting app..."
-            pm2 delete retell-dashboard || true
-            pm2 start server.js --name retell-dashboard --node-args="--experimental-sqlite"
+            echo ">>> Restarting all PM2 processes..."
+            pm2 reload all --update-env
             pm2 save
 
-            echo ">>> PM2 Status:"
+            echo ">>> PM2 Status after restart:"
             pm2 list
 
             echo ">>> Deploy complete! Site: https://calling.officialdigitalmarketing.in"
