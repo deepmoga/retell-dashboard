@@ -20,10 +20,13 @@ const VAPI_VOICES = [
   { provider: 'openai', voiceId: 'onyx',    name: 'Onyx',    gender: 'male'   },
   { provider: 'openai', voiceId: 'nova',    name: 'Nova',    gender: 'female' },
   { provider: 'openai', voiceId: 'shimmer', name: 'Shimmer', gender: 'female' },
-  { provider: 'azure',  voiceId: 'en-US-JennyNeural',   name: 'Jenny (US)',    gender: 'female' },
-  { provider: 'azure',  voiceId: 'en-AU-NatashaNeural',  name: 'Natasha (AU)',  gender: 'female' },
-  { provider: 'azure',  voiceId: 'en-GB-SoniaNeural',    name: 'Sonia (GB)',    gender: 'female' },
-  { provider: 'azure',  voiceId: 'en-IN-NeerjaNeural',   name: 'Neerja (IN)',   gender: 'female' },
+  { provider: 'azure',  voiceId: 'en-US-JennyNeural',    name: 'Jenny (US)',      gender: 'female' },
+  { provider: 'azure',  voiceId: 'en-AU-NatashaNeural',  name: 'Natasha (AU)',    gender: 'female' },
+  { provider: 'azure',  voiceId: 'en-GB-SoniaNeural',    name: 'Sonia (GB)',      gender: 'female' },
+  { provider: 'azure',  voiceId: 'en-IN-NeerjaNeural',   name: 'Neerja (IN)',     gender: 'female' },
+  { provider: 'azure',  voiceId: 'hi-IN-SwaraNeural',    name: 'Swara 🇮🇳 Hindi', gender: 'female' },
+  { provider: 'azure',  voiceId: 'hi-IN-MadhurNeural',   name: 'Madhur 🇮🇳 Hindi',gender: 'male'   },
+  { provider: 'azure',  voiceId: 'ur-PK-UzmaNeural',     name: 'Uzma 🇵🇰 Urdu',  gender: 'female' },
 ];
 
 const TEMPLATES = {
