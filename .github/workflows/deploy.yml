@@ -32,7 +32,11 @@ jobs:
             npm install --omit=dev
 
             echo ">>> Restarting app..."
-            pm2 restart retell-dashboard --update-env
+            pm2 delete retell-dashboard || true
+            pm2 start server.js --name retell-dashboard --node-args="--experimental-sqlite"
             pm2 save
+
+            echo ">>> PM2 Status:"
+            pm2 list
 
             echo ">>> Deploy complete! Site: https://calling.officialdigitalmarketing.in"
