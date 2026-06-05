@@ -113,7 +113,7 @@ function seedAdmin() {
 // --- User queries ---
 const userQueries = {
   findByEmail: db.prepare('SELECT * FROM users WHERE email = ?'),
-  findById: db.prepare('SELECT id, name, email, role, company_name, logo_url, retell_api_key, twilio_account_sid, created_at FROM users WHERE id = ?'),
+  findById: db.prepare('SELECT id, name, email, role, company_name, logo_url, retell_api_key, vapi_api_key, twilio_account_sid, twilio_auth_token, created_at FROM users WHERE id = ?'),
   findAll: db.prepare('SELECT id, name, email, role, company_name, created_at FROM users ORDER BY created_at DESC'),
   create: db.prepare(`
     INSERT INTO users (name, email, password, role, company_name, retell_api_key, twilio_account_sid, twilio_auth_token)
