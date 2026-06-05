@@ -50,33 +50,88 @@
     .add-agent-card .add-icon { font-size: 32px; }
     .add-agent-card .add-label { font-size: 14px; font-weight: 500; }
 
-    /* Modal styles */
-    .agent-modal .modal-box {
-      width: 680px; max-width: 95vw;
+    /* Modal overlay — high z-index + blur backdrop */
+    .modal-overlay {
+      z-index: 9999 !important;
+      background: rgba(0,0,0,0.85) !important;
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
     }
-    .modal-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin: -20px -20px 20px; padding: 0 20px; }
+    .agent-modal .modal-box,
+    #delete-modal .modal-box {
+      width: 700px;
+      max-width: 96vw;
+      background: #1c1c1c;
+      border: 1px solid #333;
+      border-radius: 12px;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.7);
+      overflow: hidden;
+    }
+    .modal-header {
+      background: #1c1c1c;
+      border-bottom: 1px solid #2a2a2a;
+      padding: 18px 22px;
+    }
+    .modal-body { padding: 22px; background: #1c1c1c; }
+    .modal-footer {
+      padding: 14px 22px;
+      background: #161616;
+      border-top: 1px solid #2a2a2a;
+      display: flex; justify-content: flex-end; gap: 10px;
+    }
+
+    /* Tabs */
+    .modal-tabs {
+      display: flex; gap: 0;
+      border-bottom: 1px solid #2a2a2a;
+      margin: -22px -22px 22px;
+      padding: 0 22px;
+      background: #181818;
+    }
     .modal-tab {
-      padding: 12px 16px; font-size: 13px; font-weight: 500; color: var(--text-muted);
+      padding: 13px 18px; font-size: 13px; font-weight: 500; color: #666;
       cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; white-space: nowrap;
     }
-    .modal-tab:hover { color: var(--text); }
+    .modal-tab:hover { color: #ccc; }
     .modal-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
     .tab-panel { display: none; }
     .tab-panel.active { display: block; }
 
+    /* Voice grid */
     .voice-grid {
-      display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px;
-      max-height: 260px; overflow-y: auto;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: 8px;
+      max-height: 280px;
+      overflow-y: auto;
+      padding-right: 4px;
     }
+    .voice-grid::-webkit-scrollbar { width: 4px; }
+    .voice-grid::-webkit-scrollbar-track { background: #1a1a1a; }
+    .voice-grid::-webkit-scrollbar-thumb { background: #444; border-radius: 4px; }
+
     .voice-card {
-      border: 1px solid var(--border2); border-radius: 6px; padding: 10px;
-      cursor: pointer; transition: all 0.15s; text-align: center;
+      background: #222;
+      border: 1.5px solid #2e2e2e;
+      border-radius: 8px;
+      padding: 12px 8px;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-align: center;
+      user-select: none;
     }
-    .voice-card:hover { border-color: var(--accent); background: var(--accent-dim); }
-    .voice-card.selected { border-color: var(--accent); background: var(--accent-dim); }
-    .voice-card .voice-name { font-size: 12px; font-weight: 500; }
-    .voice-card .voice-provider { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
-    .voice-card .voice-gender { font-size: 18px; margin-bottom: 4px; }
+    .voice-card:hover { border-color: var(--accent); background: rgba(0,212,170,0.08); }
+    .voice-card.selected {
+      border-color: var(--accent) !important;
+      background: rgba(0,212,170,0.12) !important;
+      box-shadow: 0 0 0 2px rgba(0,212,170,0.2);
+    }
+    .voice-card .voice-gender { font-size: 22px; margin-bottom: 6px; display: block; }
+    .voice-card .voice-name { font-size: 12px; font-weight: 600; color: #ddd; display: block; }
+    .voice-card .voice-provider {
+      font-size: 10px; color: #555; margin-top: 3px; display: block;
+      background: #2a2a2a; padding: 1px 6px; border-radius: 10px; display: inline-block;
+    }
 
     .slider-row { display: flex; align-items: center; gap: 12px; }
     .slider-row input[type=range] { flex: 1; accent-color: var(--accent); }
