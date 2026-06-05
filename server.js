@@ -76,7 +76,7 @@ app.get('/api/dashboard/stats', authMiddleware, (req, res) => {
 app.use('/webhook/retell', webhookRouter);
 
 // --- SPA fallback for HTML pages ---
-const pages = ['dashboard', 'calls', 'live', 'leads', 'costs', 'clients'];
+const pages = ['dashboard', 'calls', 'live', 'leads', 'costs', 'clients', 'settings'];
 pages.forEach(page => {
   app.get(`/${page}`, (req, res) => {
     res.sendFile(path.join(__dirname, 'public', `${page}.html`));

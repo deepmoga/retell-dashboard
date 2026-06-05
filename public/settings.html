@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings — VoiceAgent</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="app-layout">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">V</div>
+      <div><div class="logo-text">VoiceAgent</div><div class="logo-sub">Dashboard</div></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Main</div>
+      <a class="nav-item" href="/dashboard" data-page="dashboard"><span class="nav-icon">📊</span><span class="nav-label">Dashboard</span></a>
+      <a class="nav-item" href="/calls" data-page="calls"><span class="nav-icon">📞</span><span class="nav-label">Call Logs</span></a>
+      <a class="nav-item" href="/live" data-page="live"><span class="nav-icon">🔴</span><span class="nav-label">Live Calls</span></a>
+      <a class="nav-item" href="/leads" data-page="leads"><span class="nav-icon">👥</span><span class="nav-label">Leads</span></a>
+      <a class="nav-item" href="/costs" data-page="costs"><span class="nav-icon">💰</span><span class="nav-label">Cost Tracker</span></a>
+      <div class="nav-section" data-admin-only>Admin</div>
+      <a class="nav-item" href="/clients" data-page="clients" data-admin-only><span class="nav-icon">⚙️</span><span class="nav-label">Clients</span></a>
+      <div class="nav-section">Account</div>
+      <a class="nav-item active" href="/settings" data-page="settings"><span class="nav-icon">🔑</span><span class="nav-label">Settings</span></a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar" id="sidebar-user-avatar">A</div>
+        <div><div class="user-name" id="sidebar-user-name">Loading...</div><div class="user-role" id="sidebar-user-role"></div></div>
+      </div>
+      <button id="logout-btn" class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:10px">🚪 Logout</button>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Settings</div>
+        <div class="page-sub">API Keys aur account details — sab DB mein save hoga</div>
+      </div>
+    </div>
+
+    <div class="page-body" style="max-width:700px">
+
+      <!-- API Keys Card -->
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header">
+          <div class="card-title">🔑 API Keys</div>
+          <span style="font-size:12px;color:var(--accent)">DB mein save hota hai — .env edit nahi karna</span>
+        </div>
+        <div class="card-body">
+
+          <!-- Retell -->
+          <div style="margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid var(--border)">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+              <span style="font-size:18px">🤖</span>
+              <span style="font-weight:600">Retell AI</span>
+              <span id="retell-status" style="font-size:11px;padding:2px 8px;border-radius:10px;background:var(--surface2);color:var(--text-muted)">Not set</span>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Retell API Key</label>
+              <div style="display:flex;gap:8px">
+                <input type="password" id="retell-api-key" class="form-control" placeholder="key_xxxxxxxxxxxxxxxxxxxxxxxx">
+                <button class="btn btn-ghost btn-sm" onclick="toggleVisible('retell-api-key')">👁</button>
+              </div>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
+                Retell Dashboard → API Keys → Copy
+              </div>
+            </div>
+          </div>
+
+          <!-- Twilio -->
+          <div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+              <span style="font-size:18px">📞</span>
+              <span style="font-weight:600">Twilio</span>
+              <span id="twilio-status" style="font-size:11px;padding:2px 8px;border-radius:10px;background:var(--surface2);color:var(--text-muted)">Not set</span>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Account SID</label>
+                <input type="text" id="twilio-sid" class="form-control" placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Auth Token</label>
+                <div style="display:flex;gap:8px">
+                  <input type="password" id="twilio-token" class="form-control" placeholder="••••••••••••••••">
+                  <button class="btn btn-ghost btn-sm" onclick="toggleVisible('twilio-token')">👁</button>
+                </div>
+              </div>
+            </div>
+            <div style="font-size:11px;color:var(--text-muted)">
+              console.twilio.com → Account Info → Copy
+            </div>
+          </div>
+
+          <button class="btn btn-primary" id="save-keys-btn" style="width:100%;justify-content:center;margin-top:20px">
+            💾 Save API Keys
+          </button>
+        </div>
+      </div>
+
+      <!-- Profile Card -->
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header"><div class="card-title">👤 Profile</div></div>
+        <div class="card-body">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Name</label>
+              <input type="text" id="profile-name" class="form-control">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Company Name</label>
+              <input type="text" id="profile-company" class="form-control">
+            </div>
+          </div>
+          <button class="btn btn-secondary" id="save-profile-btn" style="justify-content:center">💾 Save Profile</button>
+        </div>
+      </div>
+
+      <!-- Password Card -->
+      <div class="card">
+        <div class="card-header"><div class="card-title">🔒 Change Password</div></div>
+        <div class="card-body">
+          <div class="form-group">
+            <label class="form-label">Current Password</label>
+            <input type="password" id="current-password" class="form-control" placeholder="Current password">
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">New Password</label>
+              <input type="password" id="new-password" class="form-control" placeholder="New password">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Confirm Password</label>
+              <input type="password" id="confirm-password" class="form-control" placeholder="Confirm new password">
+            </div>
+          </div>
+          <button class="btn btn-secondary" id="save-password-btn" style="justify-content:center">🔒 Update Password</button>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script src="/js/app.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+  if (!requireAuth()) return;
+  await loadProfile();
+  bindEvents();
+});
+
+async function loadProfile() {
+  try {
+    const data = await apiGet('/auth/me');
+    const u = data.user;
+
+    document.getElementById('profile-name').value = u.name || '';
+    document.getElementById('profile-company').value = u.company_name || '';
+
+    if (u.retell_api_key) {
+      document.getElementById('retell-api-key').value = u.retell_api_key;
+      setStatus('retell-status', '✓ Set', 'var(--accent)');
+    }
+    if (u.twilio_account_sid) {
+      document.getElementById('twilio-sid').value = u.twilio_account_sid;
+      setStatus('twilio-status', '✓ Set', 'var(--accent)');
+    }
+  } catch (err) {
+    toast('Failed to load profile', 'error');
+  }
+}
+
+function setStatus(id, text, color) {
+  const el = document.getElementById(id);
+  if (el) { el.textContent = text; el.style.color = color; el.style.background = color + '22'; }
+}
+
+function toggleVisible(inputId) {
+  const el = document.getElementById(inputId);
+  if (el) el.type = el.type === 'password' ? 'text' : 'password';
+}
+
+function bindEvents() {
+  // Save API Keys
+  document.getElementById('save-keys-btn').addEventListener('click', async () => {
+    const retell = document.getElementById('retell-api-key').value.trim();
+    const sid = document.getElementById('twilio-sid').value.trim();
+    const token = document.getElementById('twilio-token').value.trim();
+
+    if (!retell && !sid) {
+      toast('Kam az kam ek key daalo', 'warning');
+      return;
+    }
+
+    const btn = document.getElementById('save-keys-btn');
+    btn.disabled = true; btn.textContent = 'Saving...';
+
+    try {
+      await apiPut('/auth/profile', {
+        retell_api_key: retell,
+        twilio_account_sid: sid,
+        twilio_auth_token: token,
+      });
+
+      if (retell) setStatus('retell-status', '✓ Set', 'var(--accent)');
+      if (sid) setStatus('twilio-status', '✓ Set', 'var(--accent)');
+      toast('✅ API Keys saved to database!', 'success');
+    } catch (err) {
+      toast('Error: ' + err.message, 'error');
+    } finally {
+      btn.disabled = false; btn.textContent = '💾 Save API Keys';
+    }
+  });
+
+  // Save Profile
+  document.getElementById('save-profile-btn').addEventListener('click', async () => {
+    try {
+      await apiPut('/auth/profile', {
+        name: document.getElementById('profile-name').value,
+        company_name: document.getElementById('profile-company').value,
+      });
+      toast('Profile saved!', 'success');
+
+      // Update localStorage user
+      const u = getUser();
+      if (u) {
+        u.name = document.getElementById('profile-name').value;
+        u.company_name = document.getElementById('profile-company').value;
+        localStorage.setItem('user', JSON.stringify(u));
+      }
+    } catch (err) {
+      toast('Error: ' + err.message, 'error');
+    }
+  });
+
+  // Save Password
+  document.getElementById('save-password-btn').addEventListener('click', async () => {
+    const curr = document.getElementById('current-password').value;
+    const newP = document.getElementById('new-password').value;
+    const conf = document.getElementById('confirm-password').value;
+
+    if (!curr || !newP) { toast('Saare fields bharein', 'warning'); return; }
+    if (newP !== conf) { toast('Naye passwords match nahi karte', 'warning'); return; }
+    if (newP.length < 6) { toast('Password kam az kam 6 characters ka ho', 'warning'); return; }
+
+    try {
+      await apiPut('/auth/profile', { current_password: curr, new_password: newP });
+      toast('Password updated!', 'success');
+      document.getElementById('current-password').value = '';
+      document.getElementById('new-password').value = '';
+      document.getElementById('confirm-password').value = '';
+    } catch (err) {
+      toast('Error: ' + err.message, 'error');
+    }
+  });
+}
+</script>
+</body>
+</html>

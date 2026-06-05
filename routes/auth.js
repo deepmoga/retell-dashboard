@@ -59,4 +59,47 @@ router.get('/me', authMiddleware, (req, res) => {
   }
 });
 
+// Update own profile + API keys — saves to DB directly
+router.put('/profile', authMiddleware, async (req, res) => {
+  try {
+    const { name, company_name, retell_api_key, twilio_account_sid, twilio_auth_token, current_password, new_password } = req.body;
+    const { db } = require('../database/db');
+
+    const user = db.prepare('SELECT * FROM users WHERE id=?').get(req.user.userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    // Update API keys + profile info
+    db.prepare(`
+      UPDATE users SET
+        name = COALESCE(@name, name),
+        company_name = COALESCE(@company_name, company_name),
+        retell_api_key = @retell_api_key,
+        twilio_account_sid = @twilio_account_sid,
+        twilio_auth_token = @twilio_auth_token
+      WHERE id = @id
+    `).run({
+      name: name || user.name,
+      company_name: company_name || user.company_name,
+      retell_api_key: retell_api_key ?? user.retell_api_key ?? '',
+      twilio_account_sid: twilio_account_sid ?? user.twilio_account_sid ?? '',
+      twilio_auth_token: twilio_auth_token ?? user.twilio_auth_token ?? '',
+      id: req.user.userId,
+    });
+
+    // Update password if provided
+    if (new_password) {
+      if (!current_password) return res.status(400).json({ error: 'Current password required' });
+      const valid = await bcrypt.compare(current_password, user.password);
+      if (!valid) return res.status(401).json({ error: 'Current password is wrong' });
+      const hash = await bcrypt.hash(new_password, 10);
+      userQueries.updatePassword.run(hash, req.user.userId);
+    }
+
+    res.json({ success: true, message: 'Profile saved successfully' });
+  } catch (err) {
+    console.error('[Profile] Update error:', err.message);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 module.exports = router;
