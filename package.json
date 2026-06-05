@@ -18,7 +18,8 @@
     "twilio": "^5.0.0",
     "csv-parse": "^5.5.3",
     "dotenv": "^16.4.1",
-    "cors": "^2.8.5"
+    "cors": "^2.8.5",
+    "nodemailer": "^6.9.8"
   },
   "devDependencies": {
     "nodemon": "^3.0.3"

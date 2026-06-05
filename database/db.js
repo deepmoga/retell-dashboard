@@ -80,15 +80,61 @@ db.exec(`
     FOREIGN KEY (user_id) REFERENCES users(id)
   );
 
+  CREATE TABLE IF NOT EXISTS appointments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    call_id TEXT,
+    customer_name TEXT,
+    customer_phone TEXT,
+    customer_email TEXT,
+    appointment_date TEXT NOT NULL,
+    appointment_time TEXT NOT NULL,
+    duration_minutes INTEGER DEFAULT 30,
+    status TEXT DEFAULT 'pending',
+    service_type TEXT,
+    notes TEXT,
+    confirmation_sent INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS working_hours (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    day_of_week INTEGER NOT NULL,
+    is_open INTEGER DEFAULT 1,
+    start_time TEXT DEFAULT '09:00',
+    end_time TEXT DEFAULT '17:00',
+    slot_duration INTEGER DEFAULT 30,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS email_settings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL UNIQUE,
+    smtp_host TEXT,
+    smtp_port INTEGER DEFAULT 587,
+    smtp_user TEXT,
+    smtp_pass TEXT,
+    from_name TEXT,
+    from_email TEXT,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
+
   CREATE INDEX IF NOT EXISTS idx_calls_user_id ON calls(user_id);
   CREATE INDEX IF NOT EXISTS idx_calls_start_timestamp ON calls(start_timestamp);
   CREATE INDEX IF NOT EXISTS idx_calls_status ON calls(status);
   CREATE INDEX IF NOT EXISTS idx_leads_user_id ON leads(user_id);
   CREATE INDEX IF NOT EXISTS idx_cost_daily_user_date ON cost_daily(user_id, date);
+  CREATE INDEX IF NOT EXISTS idx_appointments_user_date ON appointments(user_id, appointment_date);
 `);
 
 // Run migrations immediately (before prepared statements below)
 try { db.exec(`ALTER TABLE users ADD COLUMN vapi_api_key TEXT`); } catch (e) { /* already exists */ }
+// New table migrations — safe to re-run
+try { db.exec(`CREATE TABLE IF NOT EXISTS appointments (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, call_id TEXT, customer_name TEXT, customer_phone TEXT, customer_email TEXT, appointment_date TEXT NOT NULL, appointment_time TEXT NOT NULL, duration_minutes INTEGER DEFAULT 30, status TEXT DEFAULT 'pending', service_type TEXT, notes TEXT, confirmation_sent INTEGER DEFAULT 0, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`); } catch(e) {}
+try { db.exec(`CREATE TABLE IF NOT EXISTS working_hours (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, day_of_week INTEGER NOT NULL, is_open INTEGER DEFAULT 1, start_time TEXT DEFAULT '09:00', end_time TEXT DEFAULT '17:00', slot_duration INTEGER DEFAULT 30)`); } catch(e) {}
+try { db.exec(`CREATE TABLE IF NOT EXISTS email_settings (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL UNIQUE, smtp_host TEXT, smtp_port INTEGER DEFAULT 587, smtp_user TEXT, smtp_pass TEXT, from_name TEXT, from_email TEXT)`); } catch(e) {}
 
 function initDatabase() {
   console.log('[DB] Database initialized at', DB_PATH);

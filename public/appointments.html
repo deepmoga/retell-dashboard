@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Appointments — VoiceAgent</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">V</div>
+      <div><div class="logo-text">VoiceAgent</div><div class="logo-sub">Dashboard</div></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Main</div>
+      <a class="nav-item" href="/dashboard" data-page="dashboard"><span class="nav-icon">📊</span><span class="nav-label">Dashboard</span></a>
+      <a class="nav-item" href="/calls" data-page="calls"><span class="nav-icon">📞</span><span class="nav-label">Call Logs</span></a>
+      <a class="nav-item" href="/live" data-page="live"><span class="nav-icon">🔴</span><span class="nav-label">Live Calls</span></a>
+      <a class="nav-item" href="/leads" data-page="leads"><span class="nav-icon">👥</span><span class="nav-label">Leads</span></a>
+      <a class="nav-item active" href="/appointments" data-page="appointments"><span class="nav-icon">📅</span><span class="nav-label">Appointments</span></a>
+      <a class="nav-item" href="/costs" data-page="costs"><span class="nav-icon">💰</span><span class="nav-label">Cost Tracker</span></a>
+      <div class="nav-section">Account</div>
+      <a class="nav-item" href="/settings" data-page="settings"><span class="nav-icon">🔑</span><span class="nav-label">Settings</span></a>
+      <div class="nav-section" data-admin-only>Admin</div>
+      <a class="nav-item" href="/clients" data-page="clients" data-admin-only><span class="nav-icon">⚙️</span><span class="nav-label">Clients</span></a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar" id="sidebar-user-avatar">A</div>
+        <div><div class="user-name" id="sidebar-user-name">Loading...</div><div class="user-role" id="sidebar-user-role"></div></div>
+      </div>
+      <button id="logout-btn" class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:10px">🚪 Logout</button>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <div class="page-header">
+      <div>
+        <div class="page-title">📅 Appointments</div>
+        <div class="page-sub">AI-booked + manual appointments</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-secondary btn-sm" id="hours-btn">🕐 Working Hours</button>
+        <button class="btn btn-secondary btn-sm" id="email-btn">📧 Email Settings</button>
+        <button class="btn btn-primary btn-sm" id="add-appt-btn">+ Add Appointment</button>
+      </div>
+    </div>
+
+    <div class="page-body">
+      <!-- Stats -->
+      <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:20px">
+        <div class="stat-card accent"><div class="stat-label">Today</div><div class="stat-value" id="stat-today">—</div></div>
+        <div class="stat-card"><div class="stat-label">This Week</div><div class="stat-value" id="stat-week">—</div></div>
+        <div class="stat-card"><div class="stat-label">Pending</div><div class="stat-value" id="stat-pending">—</div></div>
+        <div class="stat-card"><div class="stat-label">Confirmed</div><div class="stat-value" id="stat-confirmed">—</div></div>
+      </div>
+
+      <!-- Filters -->
+      <div class="filter-bar" style="margin-bottom:16px">
+        <select id="filter-status">
+          <option value="all">All Status</option>
+          <option value="confirmed">Confirmed</option>
+          <option value="pending">Pending</option>
+          <option value="completed">Completed</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+        <input type="date" id="filter-from">
+        <input type="date" id="filter-to">
+        <button class="btn btn-secondary btn-sm" onclick="loadAppointments()">🔍 Filter</button>
+      </div>
+
+      <!-- Table -->
+      <div class="card">
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Customer</th><th>Phone</th><th>Date</th><th>Time</th>
+                <th>Service</th><th>Status</th><th>Email Sent</th><th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="appt-tbody">
+              <tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted)">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Available Slots Preview -->
+      <div class="card" style="margin-top:20px">
+        <div class="card-header">
+          <div class="card-title">🟢 Next Available Slots</div>
+          <button class="btn btn-ghost btn-sm" onclick="loadSlots()">↺ Refresh</button>
+        </div>
+        <div class="card-body">
+          <div id="slots-grid" style="display:flex;flex-wrap:wrap;gap:8px">
+            <span style="color:var(--text-muted)">Loading...</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Add Appointment Modal -->
+<div class="modal-overlay" id="add-appt-modal">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">Add Appointment</div><button class="modal-close">&times;</button></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Customer Name</label><input type="text" id="a-name" class="form-control" placeholder="John Smith"></div>
+        <div class="form-group"><label class="form-label">Phone</label><input type="tel" id="a-phone" class="form-control" placeholder="+61412345678"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Email (confirmation will be sent)</label><input type="email" id="a-email" class="form-control" placeholder="john@example.com"></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Date *</label><input type="date" id="a-date" class="form-control"></div>
+        <div class="form-group"><label class="form-label">Time *</label><input type="time" id="a-time" class="form-control"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Service</label>
+          <select id="a-service" class="form-control">
+            <option value="">Select service</option>
+            <option>Social Media Promotion</option>
+            <option>SEO</option>
+            <option>Digital Marketing</option>
+            <option>Paid Promotion</option>
+            <option>Free Consultation</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Duration (minutes)</label><input type="number" id="a-duration" class="form-control" value="30" min="15" step="15"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Notes</label><textarea id="a-notes" class="form-control" rows="2"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary modal-close">Cancel</button>
+      <button class="btn btn-primary" id="save-appt-btn">💾 Save & Send Email</button>
+    </div>
+  </div>
+</div>
+
+<!-- Working Hours Modal -->
+<div class="modal-overlay" id="hours-modal">
+  <div class="modal modal-lg">
+    <div class="modal-header"><div class="modal-title">🕐 Working Hours</div><button class="modal-close">&times;</button></div>
+    <div class="modal-body">
+      <p style="color:var(--text-muted);font-size:13px;margin-bottom:16px">Set your business hours — AI will only book appointments in these time slots</p>
+      <table style="width:100%;border-collapse:collapse" id="hours-table">
+        <thead><tr>
+          <th style="text-align:left;padding:8px;color:var(--text-muted);font-size:12px">Day</th>
+          <th style="text-align:left;padding:8px;color:var(--text-muted);font-size:12px">Open?</th>
+          <th style="text-align:left;padding:8px;color:var(--text-muted);font-size:12px">Start</th>
+          <th style="text-align:left;padding:8px;color:var(--text-muted);font-size:12px">End</th>
+          <th style="text-align:left;padding:8px;color:var(--text-muted);font-size:12px">Slot (min)</th>
+        </tr></thead>
+        <tbody id="hours-tbody"></tbody>
+      </table>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary modal-close">Cancel</button>
+      <button class="btn btn-primary" id="save-hours-btn">💾 Save Working Hours</button>
+    </div>
+  </div>
+</div>
+
+<!-- Email Settings Modal -->
+<div class="modal-overlay" id="email-modal">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">📧 Email Settings</div><button class="modal-close">&times;</button></div>
+    <div class="modal-body">
+      <p style="color:var(--text-muted);font-size:13px;margin-bottom:16px">SMTP settings for sending confirmation emails to customers</p>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">SMTP Host</label><input type="text" id="e-host" class="form-control" placeholder="smtp.gmail.com"></div>
+        <div class="form-group"><label class="form-label">Port</label><input type="number" id="e-port" class="form-control" value="587"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Email / Username</label><input type="email" id="e-user" class="form-control" placeholder="you@gmail.com"></div>
+        <div class="form-group"><label class="form-label">Password / App Password</label><input type="password" id="e-pass" class="form-control"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">From Name</label><input type="text" id="e-name" class="form-control" placeholder="Official Digital Marketing"></div>
+        <div class="form-group"><label class="form-label">From Email</label><input type="email" id="e-from" class="form-control" placeholder="info@yourdomain.com"></div>
+      </div>
+      <div style="background:var(--surface2);border-radius:4px;padding:12px;font-size:12px;color:var(--text-muted);margin-top:8px">
+        💡 <strong>Gmail users:</strong> Use App Password (not your regular password)<br>
+        Google Account → Security → 2-Step Verification → App Passwords
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="test-email-btn">🧪 Test Connection</button>
+      <button class="btn btn-secondary modal-close">Cancel</button>
+      <button class="btn btn-primary" id="save-email-btn">💾 Save</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/app.js"></script>
+<script>
+const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+document.addEventListener('DOMContentLoaded', async () => {
+  if (!requireAuth()) return;
+  await Promise.all([loadAppointments(), loadSlots(), loadStats()]);
+  bindEvents();
+});
+
+async function loadStats() {
+  try {
+    const data = await apiGet('/appointments');
+    const appts = data.appointments || [];
+    const today = new Date().toISOString().slice(0,10);
+    const weekEnd = new Date(); weekEnd.setDate(weekEnd.getDate() + 7);
+    const weekStr = weekEnd.toISOString().slice(0,10);
+
+    document.getElementById('stat-today').textContent = appts.filter(a => a.appointment_date === today && a.status !== 'cancelled').length;
+    document.getElementById('stat-week').textContent = appts.filter(a => a.appointment_date >= today && a.appointment_date <= weekStr && a.status !== 'cancelled').length;
+    document.getElementById('stat-pending').textContent = appts.filter(a => a.status === 'pending').length;
+    document.getElementById('stat-confirmed').textContent = appts.filter(a => a.status === 'confirmed').length;
+  } catch(e) {}
+}
+
+async function loadAppointments() {
+  const status = document.getElementById('filter-status').value;
+  const from = document.getElementById('filter-from').value;
+  const to = document.getElementById('filter-to').value;
+  const params = new URLSearchParams();
+  if (status !== 'all') params.set('status', status);
+  if (from) params.set('from_date', from);
+  if (to) params.set('to_date', to);
+
+  try {
+    const data = await apiGet(`/appointments?${params}`);
+    renderTable(data.appointments || []);
+  } catch(err) { toast('Failed to load', 'error'); }
+}
+
+function renderTable(appts) {
+  const tbody = document.getElementById('appt-tbody');
+  if (!appts.length) {
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">📅</div><p>No appointments yet — AI will book them automatically during calls</p></div></td></tr>`;
+    return;
+  }
+  const statusColors = { confirmed:'qualified', pending:'callback', completed:'inbound', cancelled:'not_interested' };
+  tbody.innerHTML = appts.map(a => `
+    <tr>
+      <td><strong>${escHtml(a.customer_name || '—')}</strong></td>
+      <td style="font-family:monospace">${escHtml(a.customer_phone || '—')}</td>
+      <td>${escHtml(a.appointment_date)}</td>
+      <td><strong>${escHtml(a.appointment_time)}</strong></td>
+      <td>${escHtml(a.service_type || '—')}</td>
+      <td>${badge(a.status, statusColors[a.status] || 'ended')}</td>
+      <td>${a.confirmation_sent ? '<span style="color:var(--accent)">✓ Sent</span>' : '<span style="color:var(--text-muted)">—</span>'}</td>
+      <td>
+        <div class="table-actions">
+          ${a.customer_email && !a.confirmation_sent ? `<button class="btn btn-ghost btn-sm" onclick="resendEmail(${a.id})" title="Send Email">📧</button>` : ''}
+          ${a.status !== 'cancelled' ? `<button class="btn btn-ghost btn-sm" onclick="completeAppt(${a.id})" title="Mark Complete">✅</button>` : ''}
+          <button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="cancelAppt(${a.id})" title="Cancel">✕</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function loadSlots() {
+  try {
+    const data = await apiGet('/appointments/available-slots');
+    const grid = document.getElementById('slots-grid');
+    const slots = data.slots || [];
+    if (!slots.length) { grid.innerHTML = '<span style="color:var(--text-muted)">No available slots — check working hours</span>'; return; }
+    grid.innerHTML = slots.slice(0, 10).map(s => `
+      <button class="btn btn-secondary btn-sm" onclick="quickBook('${s.date}','${s.time}')"
+        style="font-size:12px">${s.date.slice(5)} ${s.time}</button>
+    `).join('');
+  } catch(e) {}
+}
+
+function quickBook(date, time) {
+  document.getElementById('a-date').value = date;
+  document.getElementById('a-time').value = time;
+  openModal('add-appt-modal');
+}
+
+async function resendEmail(id) {
+  try {
+    const r = await apiPost(`/appointments/${id}/send-confirmation`, {});
+    toast(r.message, r.success ? 'success' : 'error');
+    if (r.success) loadAppointments();
+  } catch(err) { toast('Failed: ' + err.message, 'error'); }
+}
+
+async function completeAppt(id) {
+  try {
+    await apiPut(`/appointments/${id}`, { status: 'completed' });
+    toast('Marked as completed', 'success'); loadAppointments(); loadStats();
+  } catch(err) { toast('Failed', 'error'); }
+}
+
+async function cancelAppt(id) {
+  if (!confirm('Cancel this appointment?')) return;
+  try {
+    await apiDelete(`/appointments/${id}`);
+    toast('Appointment cancelled', 'success'); loadAppointments(); loadStats(); loadSlots();
+  } catch(err) { toast('Failed', 'error'); }
+}
+
+function bindEvents() {
+  document.getElementById('filter-status').addEventListener('change', loadAppointments);
+
+  document.getElementById('add-appt-btn').addEventListener('click', () => openModal('add-appt-modal'));
+  document.getElementById('save-appt-btn').addEventListener('click', async () => {
+    const date = document.getElementById('a-date').value;
+    const time = document.getElementById('a-time').value;
+    if (!date || !time) { toast('Date and time required', 'warning'); return; }
+    try {
+      await apiPost('/appointments', {
+        customer_name: document.getElementById('a-name').value,
+        customer_phone: document.getElementById('a-phone').value,
+        customer_email: document.getElementById('a-email').value,
+        appointment_date: date, appointment_time: time,
+        service_type: document.getElementById('a-service').value,
+        notes: document.getElementById('a-notes').value,
+        duration_minutes: document.getElementById('a-duration').value,
+      });
+      closeModal('add-appt-modal');
+      toast('Appointment saved! Email sent if email provided.', 'success');
+      loadAppointments(); loadStats(); loadSlots();
+    } catch(err) { toast('Error: ' + err.message, 'error'); }
+  });
+
+  // Working Hours
+  document.getElementById('hours-btn').addEventListener('click', async () => {
+    const data = await apiGet('/appointments/working-hours').catch(() => ({ working_hours: [] }));
+    const hours = data.working_hours;
+    const tbody = document.getElementById('hours-tbody');
+    tbody.innerHTML = DAYS.map((day, i) => {
+      const h = hours.find(x => x.day_of_week === i) || { day_of_week: i, is_open: i >= 1 && i <= 5 ? 1 : 0, start_time: '09:00', end_time: '17:00', slot_duration: 30 };
+      return `<tr>
+        <td style="padding:8px;font-size:13px;font-weight:500">${day}</td>
+        <td style="padding:8px"><label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+          <input type="checkbox" id="h-open-${i}" ${h.is_open ? 'checked' : ''} onchange="toggleDay(${i})"> Open
+        </label></td>
+        <td style="padding:8px"><input type="time" id="h-start-${i}" value="${h.start_time}" class="form-control" style="width:110px" ${!h.is_open ? 'disabled' : ''}></td>
+        <td style="padding:8px"><input type="time" id="h-end-${i}" value="${h.end_time}" class="form-control" style="width:110px" ${!h.is_open ? 'disabled' : ''}></td>
+        <td style="padding:8px"><input type="number" id="h-slot-${i}" value="${h.slot_duration || 30}" class="form-control" style="width:70px" min="15" step="15" ${!h.is_open ? 'disabled' : ''}></td>
+      </tr>`;
+    }).join('');
+    openModal('hours-modal');
+  });
+
+  document.getElementById('save-hours-btn').addEventListener('click', async () => {
+    const hours = DAYS.map((_, i) => ({
+      day_of_week: i,
+      is_open: document.getElementById(`h-open-${i}`).checked ? 1 : 0,
+      start_time: document.getElementById(`h-start-${i}`).value,
+      end_time: document.getElementById(`h-end-${i}`).value,
+      slot_duration: parseInt(document.getElementById(`h-slot-${i}`).value) || 30,
+    }));
+    try {
+      await apiPost('/appointments/working-hours', { working_hours: hours });
+      closeModal('hours-modal');
+      toast('Working hours saved!', 'success');
+      loadSlots();
+    } catch(err) { toast('Error: ' + err.message, 'error'); }
+  });
+
+  // Email Settings
+  document.getElementById('email-btn').addEventListener('click', async () => {
+    const data = await apiGet('/appointments/email-settings').catch(() => ({ settings: {} }));
+    const s = data.settings;
+    document.getElementById('e-host').value = s.smtp_host || '';
+    document.getElementById('e-port').value = s.smtp_port || 587;
+    document.getElementById('e-user').value = s.smtp_user || '';
+    document.getElementById('e-name').value = s.from_name || '';
+    document.getElementById('e-from').value = s.from_email || '';
+    openModal('email-modal');
+  });
+
+  document.getElementById('save-email-btn').addEventListener('click', async () => {
+    try {
+      await apiPost('/appointments/email-settings', {
+        smtp_host: document.getElementById('e-host').value,
+        smtp_port: parseInt(document.getElementById('e-port').value),
+        smtp_user: document.getElementById('e-user').value,
+        smtp_pass: document.getElementById('e-pass').value,
+        from_name: document.getElementById('e-name').value,
+        from_email: document.getElementById('e-from').value,
+      });
+      closeModal('email-modal');
+      toast('Email settings saved!', 'success');
+    } catch(err) { toast('Error: ' + err.message, 'error'); }
+  });
+
+  document.getElementById('test-email-btn').addEventListener('click', async () => {
+    toast('Testing connection...', 'info');
+    try {
+      const r = await apiPost('/appointments/email-settings/test', {});
+      toast(r.ok ? '✓ Email connection works!' : '✗ ' + r.error, r.ok ? 'success' : 'error');
+    } catch(err) { toast('Test failed: ' + err.message, 'error'); }
+  });
+}
+
+function toggleDay(i) {
+  const isOpen = document.getElementById(`h-open-${i}`).checked;
+  ['start','end','slot'].forEach(f => {
+    const el = document.getElementById(`h-${f}-${i}`);
+    if (el) el.disabled = !isOpen;
+  });
+}
+</script>
+</body>
+</html>
