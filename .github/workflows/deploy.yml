@@ -25,20 +25,30 @@ jobs:
             set -e
             cd /var/www/retell-dashboard
 
-            echo ">>> Current PM2 processes:"
-            pm2 list
-
             echo ">>> Pulling latest code..."
             git pull origin main
+
+            echo ">>> Latest commits:"
+            git log --oneline -3
+
+            echo ">>> Checking agents route file exists:"
+            ls -la routes/agents.js
+
+            echo ">>> Checking server.js has agents route:"
+            grep -n "agents" server.js
 
             echo ">>> Installing dependencies..."
             npm install --omit=dev
 
-            echo ">>> Restarting all PM2 processes..."
-            pm2 reload all --update-env
+            echo ">>> Stopping old retell-dashboard process..."
+            pm2 stop retell-dashboard || true
+            pm2 delete retell-dashboard || true
+
+            echo ">>> Starting fresh with correct node args..."
+            pm2 start server.js --name retell-dashboard --node-args="--experimental-sqlite" --wait-ready --listen-timeout 10000
             pm2 save
 
-            echo ">>> PM2 Status after restart:"
+            echo ">>> PM2 Status:"
             pm2 list
 
             echo ">>> Deploy complete! Site: https://calling.officialdigitalmarketing.in"
