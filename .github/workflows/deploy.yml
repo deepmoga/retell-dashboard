@@ -17,7 +17,7 @@ jobs:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: calling.officialdigitalmarketing.in
+          host: 62.84.184.96
           username: root
           password: ${{ secrets.ROOT }}
           port: 22
