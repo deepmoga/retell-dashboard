@@ -87,15 +87,10 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_cost_daily_user_date ON cost_daily(user_id, date);
 `);
 
-// Called from server.js — also runs migrations
+// Run migrations immediately (before prepared statements below)
+try { db.exec(`ALTER TABLE users ADD COLUMN vapi_api_key TEXT`); } catch (e) { /* already exists */ }
+
 function initDatabase() {
-  // Migration: add vapi_api_key column if it doesn't exist
-  try {
-    db.exec(`ALTER TABLE users ADD COLUMN vapi_api_key TEXT`);
-    console.log('[DB] Migration: added vapi_api_key column');
-  } catch (e) {
-    // Column already exists — ignore
-  }
   console.log('[DB] Database initialized at', DB_PATH);
 }
 
