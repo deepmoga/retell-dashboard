@@ -84,8 +84,9 @@ function renderTable(calls) {
       <td colspan="11" style="padding:0">
         <div class="inline-player" style="padding:12px 16px;background:var(--surface2);border-top:1px solid var(--border)">
           <audio id="audio-${c.id}" controls preload="none" style="width:100%;height:36px;accent-color:var(--accent)"
-            onerror="this.parentElement.innerHTML='<span style=color:var(--danger)>⚠ Recording unavailable or expired</span>'">
-            <source src="/api/calls/${c.id}/recording?t=${Date.now()}" type="audio/mpeg">
+            onerror="this.parentElement.innerHTML='<span style=color:var(--danger);font-size:13px>⚠ Recording unavailable or expired</span>'">
+            <source src="/api/calls/${c.id}/recording?token=${getToken()}&t=${Date.now()}" type="audio/wav">
+            <source src="/api/calls/${c.id}/recording?token=${getToken()}&t=${Date.now()}" type="audio/mpeg">
           </audio>
         </div>
       </td>

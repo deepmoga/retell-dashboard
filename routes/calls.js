@@ -68,7 +68,19 @@ router.get('/:id/recording', async (req, res) => {
     // 1. Serve local file if already downloaded
     if (call.recording_local_path) {
       const localFile = path.join(__dirname, '../public', call.recording_local_path);
-      return res.sendFile(localFile);
+      // Set correct content type based on extension
+      const ext = path.extname(localFile).toLowerCase();
+      const mime = ext === '.wav' ? 'audio/wav' : 'audio/mpeg';
+      res.setHeader('Content-Type', mime);
+      res.setHeader('Accept-Ranges', 'bytes');
+      return res.sendFile(localFile, (err) => {
+        if (err) {
+          console.error('[Recording] sendFile error:', err.message, '| Path:', localFile);
+          // Fallback to proxying from URL
+          if (call.recording_url) return res.redirect(call.recording_url);
+          res.status(404).json({ error: 'Recording file not found' });
+        }
+      });
     }
 
     // 2. Proxy from Retell URL with auth header (fixes CORS + auth issue)
