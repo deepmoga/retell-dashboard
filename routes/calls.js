@@ -1,6 +1,7 @@
 const express = require('express');
 const path = require('path');
-const { callQueries, buildCallsQuery } = require('../database/db');
+const axios = require('axios');
+const { callQueries, buildCallsQuery, db } = require('../database/db');
 const { syncAllCalls } = require('../services/sync');
 const authMiddleware = require('../middleware/auth');
 
@@ -55,7 +56,7 @@ router.get('/:id', (req, res) => {
   }
 });
 
-router.get('/:id/recording', (req, res) => {
+router.get('/:id/recording', async (req, res) => {
   try {
     const call = callQueries.findById.get(req.params.id);
     if (!call) return res.status(404).json({ error: 'Call not found' });
@@ -64,14 +65,41 @@ router.get('/:id/recording', (req, res) => {
       return res.status(403).json({ error: 'Access denied' });
     }
 
+    // 1. Serve local file if already downloaded
     if (call.recording_local_path) {
-      return res.sendFile(path.join(__dirname, '../public', call.recording_local_path));
+      const localFile = path.join(__dirname, '../public', call.recording_local_path);
+      return res.sendFile(localFile);
     }
+
+    // 2. Proxy from Retell URL with auth header (fixes CORS + auth issue)
     if (call.recording_url) {
-      return res.redirect(call.recording_url);
+      try {
+        // Get API key for this user
+        const user = db.prepare('SELECT retell_api_key FROM users WHERE id=?').get(call.user_id);
+        const apiKey = user?.retell_api_key || process.env.RETELL_API_KEY;
+
+        const response = await axios.get(call.recording_url, {
+          responseType: 'stream',
+          timeout: 30000,
+          headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {},
+        });
+
+        res.setHeader('Content-Type', response.headers['content-type'] || 'audio/mpeg');
+        res.setHeader('Accept-Ranges', 'bytes');
+        if (response.headers['content-length']) {
+          res.setHeader('Content-Length', response.headers['content-length']);
+        }
+        return response.data.pipe(res);
+      } catch (proxyErr) {
+        console.error('[Recording] Proxy error:', proxyErr.message);
+        // Fallback: direct redirect
+        return res.redirect(call.recording_url);
+      }
     }
+
     res.status(404).json({ error: 'Recording not available' });
   } catch (err) {
+    console.error('[Recording] Error:', err.message);
     res.status(500).json({ error: 'Server error' });
   }
 });

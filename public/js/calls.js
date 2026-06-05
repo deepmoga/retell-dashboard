@@ -82,8 +82,11 @@ function renderTable(calls) {
     </tr>
     <tr id="player-row-${c.id}" style="display:none">
       <td colspan="11" style="padding:0">
-        <div class="inline-player">
-          <audio controls src="/api/calls/${c.id}/recording" preload="none" style="width:100%;height:36px"></audio>
+        <div class="inline-player" style="padding:12px 16px;background:var(--surface2);border-top:1px solid var(--border)">
+          <audio id="audio-${c.id}" controls preload="none" style="width:100%;height:36px;accent-color:var(--accent)"
+            onerror="this.parentElement.innerHTML='<span style=color:var(--danger)>⚠ Recording unavailable or expired</span>'">
+            <source src="/api/calls/${c.id}/recording?t=${Date.now()}" type="audio/mpeg">
+          </audio>
         </div>
       </td>
     </tr>
@@ -94,12 +97,34 @@ function togglePlayer(callId) {
   const row = document.getElementById(`player-row-${callId}`);
   if (!row) return;
   const isOpen = row.style.display !== 'none';
+
+  // Pause previous player
   if (activePlayer && activePlayer !== callId) {
     const prev = document.getElementById(`player-row-${activePlayer}`);
-    if (prev) { prev.style.display = 'none'; prev.querySelector('audio')?.pause(); }
+    if (prev) {
+      prev.style.display = 'none';
+      const prevAudio = document.getElementById(`audio-${activePlayer}`);
+      if (prevAudio) prevAudio.pause();
+    }
   }
-  row.style.display = isOpen ? 'none' : 'table-row';
-  activePlayer = isOpen ? null : callId;
+
+  if (isOpen) {
+    row.style.display = 'none';
+    const audio = document.getElementById(`audio-${callId}`);
+    if (audio) audio.pause();
+    activePlayer = null;
+  } else {
+    row.style.display = 'table-row';
+    activePlayer = callId;
+    // Auto-play after small delay
+    setTimeout(() => {
+      const audio = document.getElementById(`audio-${callId}`);
+      if (audio) {
+        audio.load();
+        audio.play().catch(() => {}); // user gesture needed on some browsers
+      }
+    }, 100);
+  }
 }
 
 async function viewTranscript(callId) {
