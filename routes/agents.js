@@ -39,20 +39,28 @@ router.post('/', async (req, res) => {
 
     const { agent_name, voice_provider, voice_id, language, first_message, system_prompt, responsiveness, interruption_sensitivity } = req.body;
 
+    const modelChoice = req.body.model_id || 'gpt-4o-mini';
+    const modelProvider = modelChoice.startsWith('llama') || modelChoice.startsWith('mixtral') || modelChoice.startsWith('gemma') ? 'groq' : 'openai';
+
     const payload = {
       name: agent_name || 'New Agent',
       model: {
-        provider: 'openai',
-        model: 'gpt-4o-mini',
+        provider: modelProvider,
+        model: modelChoice,
         systemPrompt: system_prompt || '',
+        temperature: 0.7,
       },
       voice: {
         provider: voice_provider || '11labs',
         voiceId: voice_id || 'paula',
+        speed: 1.1,
       },
       firstMessage: first_message || '',
       language: language || 'en-US',
-      backgroundDenoisingEnabled: true,
+      responseDelaySeconds: 0,
+      llmRequestDelaySeconds: 0,
+      backgroundDenoisingEnabled: false,
+      firstMessageMode: 'assistant-speaks-first',
     };
 
     const agent = await vapi.createAssistant(apiKey, payload);
@@ -67,13 +75,20 @@ router.put('/:id', async (req, res) => {
     const apiKey = getVapiKey(req);
     const { agent_name, voice_provider, voice_id, language, first_message, system_prompt } = req.body;
 
-    const payload = {};
+    const { model_id } = req.body;
+    const modelChoice = model_id || 'gpt-4o-mini';
+    const modelProvider = modelChoice.startsWith('llama') || modelChoice.startsWith('mixtral') || modelChoice.startsWith('gemma') ? 'groq' : 'openai';
+
+    const payload = {
+      responseDelaySeconds: 0,
+      llmRequestDelaySeconds: 0,
+    };
     if (agent_name !== undefined) payload.name = agent_name;
     if (first_message !== undefined) payload.firstMessage = first_message;
     if (language !== undefined) payload.language = language;
-    if (system_prompt !== undefined) payload.model = { provider: 'openai', model: 'gpt-4o-mini', systemPrompt: system_prompt };
+    if (system_prompt !== undefined) payload.model = { provider: modelProvider, model: modelChoice, systemPrompt: system_prompt, temperature: 0.7 };
     if (voice_provider !== undefined || voice_id !== undefined) {
-      payload.voice = { provider: voice_provider || '11labs', voiceId: voice_id || 'paula' };
+      payload.voice = { provider: voice_provider || '11labs', voiceId: voice_id || 'paula', speed: 1.1 };
     }
 
     await vapi.updateAssistant(apiKey, req.params.id, payload);

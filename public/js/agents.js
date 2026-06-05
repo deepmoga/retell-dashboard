@@ -227,6 +227,9 @@ async function openEditAgentModal(agentId) {
     const vname = allVoices.find(v => v.provider === vp && v.voiceId === vid)?.name || vid;
     selectVoice(vp, vid, vname);
 
+    const modelSel = document.getElementById('f-model-id');
+    if (modelSel && a.model?.model) modelSel.value = a.model.model;
+
     switchTab('basic');
     openModal('agent-modal');
   } catch (err) {
@@ -245,6 +248,7 @@ async function saveAgent() {
     language: document.getElementById('f-language').value,
     first_message: document.getElementById('f-begin-message').value.trim(),
     system_prompt: document.getElementById('f-system-prompt').value.trim(),
+    model_id: document.getElementById('f-model-id').value || 'gpt-4o-mini',
   };
 
   const btn = document.getElementById('save-agent-btn');

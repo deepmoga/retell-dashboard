@@ -310,30 +310,29 @@
       <!-- Advanced Tab -->
       <div class="tab-panel" id="tab-advanced">
         <div class="form-group">
-          <label class="form-label">Responsiveness <span style="color:var(--text-muted);font-weight:400">(how quickly agent responds)</span></label>
-          <div class="slider-row">
-            <span style="font-size:12px;color:var(--text-muted)">Slow</span>
-            <input type="range" id="f-responsiveness" min="0" max="1" step="0.05" value="1"
-              oninput="document.getElementById('resp-val').textContent=parseFloat(this.value).toFixed(2)">
-            <span style="font-size:12px;color:var(--text-muted)">Fast</span>
-            <span class="slider-val" id="resp-val">1.00</span>
+          <label class="form-label">🚀 LLM Model <span style="color:var(--text-muted);font-weight:400">(speed vs quality)</span></label>
+          <select id="f-model-id" class="form-control">
+            <optgroup label="⚡ Ultra Fast (Groq)">
+              <option value="llama-3.1-8b-instant">Llama 3.1 8B — Fastest ⚡⚡⚡</option>
+              <option value="llama-3.1-70b-versatile">Llama 3.1 70B — Fast + Smart ⚡⚡</option>
+              <option value="mixtral-8x7b-32768">Mixtral 8x7B — Fast ⚡⚡</option>
+            </optgroup>
+            <optgroup label="🧠 OpenAI">
+              <option value="gpt-4o-mini" selected>GPT-4o Mini — Balanced ✅</option>
+              <option value="gpt-4o">GPT-4o — Smartest 🧠</option>
+              <option value="gpt-3.5-turbo">GPT-3.5 Turbo — Fast ⚡</option>
+            </optgroup>
+          </select>
+          <div style="margin-top:6px;font-size:12px;color:var(--text-muted)">
+            💡 Hindi ke liye <strong style="color:var(--accent)">Llama 3.1 8B (Groq)</strong> sabse fast hai — response almost instant aata hai
           </div>
         </div>
-        <div class="form-group">
-          <label class="form-label">Interruption Sensitivity <span style="color:var(--text-muted);font-weight:400">(how easily caller can interrupt)</span></label>
-          <div class="slider-row">
-            <span style="font-size:12px;color:var(--text-muted)">Low</span>
-            <input type="range" id="f-interruption" min="0" max="1" step="0.05" value="1"
-              oninput="document.getElementById('intr-val').textContent=parseFloat(this.value).toFixed(2)">
-            <span style="font-size:12px;color:var(--text-muted)">High</span>
-            <span class="slider-val" id="intr-val">1.00</span>
-          </div>
-        </div>
-        <div style="padding:12px;background:var(--surface2);border-radius:6px;border:1px solid var(--border);font-size:12px;color:var(--text-muted)">
-          <strong style="color:var(--text)">Tips:</strong><br>
-          • Set responsiveness lower if the agent cuts off too quickly<br>
-          • Reduce interruption sensitivity to make the agent less easily interrupted<br>
-          • Both values of 1.0 are defaults recommended for most use cases
+        <div style="padding:12px;background:rgba(0,212,170,0.06);border-radius:6px;border:1px solid rgba(0,212,170,0.2);font-size:12px;color:var(--text-muted);margin-top:4px">
+          <strong style="color:var(--accent)">Speed Tips:</strong><br>
+          • <strong style="color:#ddd">Groq models</strong> — 10x faster than OpenAI, best for voice calls<br>
+          • <strong style="color:#ddd">GPT-4o Mini</strong> — good balance, works for most cases<br>
+          • <strong style="color:#ddd">GPT-4o</strong> — smartest but slower, use only if needed<br>
+          • Response delay aur LLM delay dono <strong style="color:var(--accent)">0</strong> set hain by default
         </div>
       </div>
     </div>
