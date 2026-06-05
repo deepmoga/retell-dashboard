@@ -158,8 +158,8 @@ router.post('/:id/call', async (req, res) => {
       require('../database/db').db.prepare('SELECT email FROM users WHERE id=?').get(userId)?.email
     );
     const actualUser = require('../database/db').db.prepare('SELECT * FROM users WHERE id=?').get(userId);
-    if (!actualUser?.retell_api_key) {
-      return res.status(400).json({ error: 'No Retell API key configured for this account' });
+    if (!actualUser?.retell_api_key && !actualUser?.vapi_api_key) {
+      return res.status(400).json({ error: 'No API key configured. Go to Settings and add Retell or VAPI key.' });
     }
 
     const { agent_id, from_number } = req.body;

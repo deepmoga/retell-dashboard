@@ -33,11 +33,18 @@ async function loadAgentsAndNumbers() {
     const fromSel = document.getElementById('call-from');
     if (agentSel) {
       agentSel.innerHTML = '<option value="">Select Agent</option>' +
-        allAgents.map(a => `<option value="${escHtml(a.agent_id)}">${escHtml(a.agent_name || a.agent_id)}</option>`).join('');
+        allAgents.map(a => {
+          const badge = a.provider === 'vapi' ? ' 🎙️ VAPI' : ' 🤖 Retell';
+          return `<option value="${escHtml(a.id)}" data-provider="${escHtml(a.provider || 'retell')}">${escHtml(a.name || a.id)}${badge}</option>`;
+        }).join('');
     }
     if (fromSel) {
       fromSel.innerHTML = '<option value="">Select Number</option>' +
-        allPhoneNumbers.map(n => `<option value="${escHtml(n.phone_number)}">${escHtml(n.phone_number)} ${n.nickname ? '('+n.nickname+')' : ''}</option>`).join('');
+        allPhoneNumbers.map(n => {
+          const num = n.number || n.phone_number || '';
+          const badge = n.provider === 'vapi' ? ' 🎙️' : ' 🤖';
+          return `<option value="${escHtml(n.id || num)}" data-provider="${escHtml(n.provider || 'retell')}">${escHtml(num)}${n.nickname ? ' ('+n.nickname+')' : ''}${badge}</option>`;
+        }).join('');
     }
   } catch (err) {
     console.error('Agent/number load error:', err);
@@ -107,8 +114,11 @@ function callLead(id, name) {
 
 document.getElementById('confirm-call-btn')?.addEventListener('click', async () => {
   const leadId = document.getElementById('confirm-lead-id').value;
-  const agentId = document.getElementById('call-agent').value;
-  const fromNumber = document.getElementById('call-from').value;
+  const agentSel = document.getElementById('call-agent');
+  const fromSel = document.getElementById('call-from');
+  const agentId = agentSel.value;
+  const fromNumber = fromSel.value;
+  const provider = agentSel.selectedOptions[0]?.dataset?.provider || 'retell';
 
   if (!agentId || !fromNumber) {
     toast('Please select an agent and phone number', 'warning');
@@ -116,7 +126,7 @@ document.getElementById('confirm-call-btn')?.addEventListener('click', async () 
   }
 
   try {
-    await apiPost(`/leads/${leadId}/call`, { agent_id: agentId, from_number: fromNumber });
+    await apiPost(`/leads/${leadId}/call`, { agent_id: agentId, from_number: fromNumber, provider });
     closeModal('call-confirm-modal');
     toast('Call initiated!', 'success');
     loadLeads();
