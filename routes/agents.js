@@ -18,41 +18,70 @@ function getModelProvider(modelChoice) {
     ? 'groq' : 'openai';
 }
 
-// VAPI serverUrl approach — single webhook handles all function calls
-function getServerUrl(userId) {
-  return `${BASE_URL}/api/vapi-tools/${userId}/call`;
-}
+// Create or reuse VAPI tools for a user, return their IDs
+async function ensureBookingTools(apiKey, userId) {
+  try {
+    const serverBase = `${BASE_URL}/api/vapi-tools/${userId}`;
+    const existing = await vapi.listTools(apiKey);
 
-// Function definitions for booking (no server URL per function — serverUrl handles all)
-const BOOKING_FUNCTIONS = [
-  {
-    name: 'checkAvailability',
-    description: 'Check if a date and time slot is available for booking an appointment',
-    parameters: {
-      type: 'object',
-      properties: {
-        date: { type: 'string', description: 'Date in YYYY-MM-DD format e.g. 2024-12-25' },
-        time: { type: 'string', description: 'Time in HH:MM 24-hour format e.g. 10:00 or 14:30' },
+    const findOrCreate = async (name, description, parameters, url) => {
+      const found = existing.find(t => t.function?.name === name);
+      if (found) {
+        // update URL in case domain changed
+        try {
+          const client = require('axios').create({
+            baseURL: 'https://api.vapi.ai',
+            headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+          });
+          await client.patch(`/tool/${found.id}`, { server: { url } });
+        } catch (_) {}
+        return found.id;
+      }
+      const created = await vapi.createTool(apiKey, {
+        type: 'function',
+        function: { name, description, parameters },
+        server: { url },
+      });
+      return created.id;
+    };
+
+    const checkId = await findOrCreate(
+      'checkAvailability',
+      'Check if a date and time slot is available for booking an appointment',
+      {
+        type: 'object',
+        properties: {
+          date: { type: 'string', description: 'Date in YYYY-MM-DD format e.g. 2024-12-25' },
+          time: { type: 'string', description: 'Time in HH:MM 24-hour format e.g. 10:00 or 14:30' },
+        },
+        required: ['date', 'time'],
       },
-      required: ['date', 'time'],
-    },
-  },
-  {
-    name: 'bookAppointment',
-    description: 'Save a confirmed appointment booking into the system',
-    parameters: {
-      type: 'object',
-      properties: {
-        date:           { type: 'string', description: 'Date in YYYY-MM-DD format' },
-        time:           { type: 'string', description: 'Time in HH:MM 24-hour format' },
-        customer_name:  { type: 'string', description: 'Full name of the customer' },
-        customer_phone: { type: 'string', description: 'Customer phone number' },
-        service_type:   { type: 'string', description: 'Type of service being booked' },
+      `${serverBase}/check-availability`
+    );
+
+    const bookId = await findOrCreate(
+      'bookAppointment',
+      'Save a confirmed appointment booking into the system',
+      {
+        type: 'object',
+        properties: {
+          date:           { type: 'string', description: 'Date in YYYY-MM-DD format' },
+          time:           { type: 'string', description: 'Time in HH:MM 24-hour format' },
+          customer_name:  { type: 'string', description: 'Full name of the customer' },
+          customer_phone: { type: 'string', description: 'Customer phone number' },
+          service_type:   { type: 'string', description: 'Type of service being booked' },
+        },
+        required: ['date', 'time', 'customer_name', 'customer_phone'],
       },
-      required: ['date', 'time', 'customer_name', 'customer_phone'],
-    },
-  },
-];
+      `${serverBase}/book-appointment`
+    );
+
+    return [checkId, bookId];
+  } catch (err) {
+    console.error('[ensureBookingTools] Error:', err.response?.data || err.message);
+    return [];
+  }
+}
 
 router.get('/', async (req, res) => {
   try {
@@ -83,16 +112,18 @@ router.post('/', async (req, res) => {
     const { agent_name, voice_provider, voice_id, language, first_message, system_prompt } = req.body;
     const modelChoice = req.body.model_id || 'gpt-4o-mini';
 
+    // Create booking tools and get their IDs
+    const toolIds = await ensureBookingTools(apiKey, req.user.userId);
+
     const payload = {
       name: agent_name || 'New Agent',
-      serverUrl: getServerUrl(req.user.userId),
       model: {
         provider: getModelProvider(modelChoice),
         model: modelChoice,
         systemPrompt: system_prompt || '',
         temperature: 0.7,
-        functions: BOOKING_FUNCTIONS,
       },
+      ...(toolIds.length > 0 ? { toolIds } : {}),
       voice: {
         provider: voice_provider || '11labs',
         voiceId: voice_id || 'paula',
@@ -119,9 +150,12 @@ router.put('/:id', async (req, res) => {
     const { agent_name, voice_provider, voice_id, language, first_message, system_prompt } = req.body;
     const modelChoice = req.body.model_id || 'gpt-4o-mini';
 
+    // Ensure booking tools exist and get IDs
+    const toolIds = await ensureBookingTools(apiKey, req.user.userId);
+
     const payload = {
-      serverUrl: getServerUrl(req.user.userId),
       responseDelaySeconds: 0,
+      ...(toolIds.length > 0 ? { toolIds } : {}),
     };
 
     if (agent_name !== undefined) payload.name = agent_name;
@@ -134,7 +168,6 @@ router.put('/:id', async (req, res) => {
         model: modelChoice,
         systemPrompt: system_prompt,
         temperature: 0.7,
-        functions: BOOKING_FUNCTIONS,
       };
     }
 

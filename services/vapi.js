@@ -94,6 +94,24 @@ function normalizeCallData(raw, userId) {
   };
 }
 
+async function createTool(apiKey, toolConfig) {
+  const client = vapiClient(apiKey);
+  const response = await client.post('/tool', toolConfig);
+  return response.data;
+}
+
+async function listTools(apiKey) {
+  const client = vapiClient(apiKey);
+  const response = await client.get('/tool');
+  return Array.isArray(response.data) ? response.data : [];
+}
+
+async function deleteTool(apiKey, toolId) {
+  const client = vapiClient(apiKey);
+  await client.delete(`/tool/${toolId}`);
+  return true;
+}
+
 async function getAssistant(apiKey, id) {
   const client = vapiClient(apiKey);
   const response = await client.get(`/assistant/${id}`);
@@ -121,4 +139,5 @@ async function deleteAssistant(apiKey, id) {
 module.exports = {
   listCalls, getCall, createOutboundCall, listAssistants, listPhoneNumbers, normalizeCallData,
   getAssistant, createAssistant, updateAssistant, deleteAssistant,
+  createTool, listTools, deleteTool,
 };
