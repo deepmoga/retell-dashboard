@@ -42,6 +42,9 @@ router.post('/', async (req, res) => {
     const modelChoice = req.body.model_id || 'gpt-4o-mini';
     const modelProvider = modelChoice.startsWith('llama') || modelChoice.startsWith('mixtral') || modelChoice.startsWith('gemma') ? 'groq' : 'openai';
 
+    const BASE_URL = process.env.BASE_URL || 'https://calling.officialdigitalmarketing.in';
+    const userId = req.user.userId;
+
     const payload = {
       name: agent_name || 'New Agent',
       model: {
@@ -49,6 +52,43 @@ router.post('/', async (req, res) => {
         model: modelChoice,
         systemPrompt: system_prompt || '',
         temperature: 0.7,
+        tools: [
+          {
+            type: 'function',
+            function: {
+              name: 'checkAvailability',
+              description: 'Check if a date/time slot is available for booking a consultation',
+              parameters: {
+                type: 'object',
+                properties: {
+                  date: { type: 'string', description: 'Date in YYYY-MM-DD format, e.g. 2024-12-25' },
+                  time: { type: 'string', description: 'Time in HH:MM format (24h), e.g. 10:00' },
+                },
+                required: ['date', 'time'],
+              },
+            },
+            server: { url: `${BASE_URL}/api/vapi-tools/${userId}/check-availability` },
+          },
+          {
+            type: 'function',
+            function: {
+              name: 'bookAppointment',
+              description: 'Save a confirmed appointment booking in the system',
+              parameters: {
+                type: 'object',
+                properties: {
+                  date:            { type: 'string', description: 'Date in YYYY-MM-DD format' },
+                  time:            { type: 'string', description: 'Time in HH:MM 24h format' },
+                  customer_name:   { type: 'string', description: 'Full name of the customer' },
+                  customer_phone:  { type: 'string', description: 'Customer phone number' },
+                  service_type:    { type: 'string', description: 'Service they are booking for' },
+                },
+                required: ['date', 'time', 'customer_name', 'customer_phone'],
+              },
+            },
+            server: { url: `${BASE_URL}/api/vapi-tools/${userId}/book-appointment` },
+          },
+        ],
       },
       voice: {
         provider: voice_provider || '11labs',

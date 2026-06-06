@@ -18,6 +18,7 @@ const liveRoutes = require('./routes/live');
 const clientRoutes = require('./routes/clients');
 const appointmentRoutes = require('./routes/appointments');
 const agentRoutes = require('./routes/agents');
+const vapiToolRoutes = require('./routes/vapi-tools');
 
 // --- Init ---
 initDatabase();
@@ -62,6 +63,7 @@ app.use('/api/live', liveRoutes);
 app.use('/api/clients', clientRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/agents', agentRoutes);
+app.use('/api/vapi-tools', vapiToolRoutes);
 
 // Dashboard stats endpoint
 const authMiddleware = require('./middleware/auth');
