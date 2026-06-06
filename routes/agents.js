@@ -18,6 +18,28 @@ function getModelProvider(modelChoice) {
     ? 'groq' : 'openai';
 }
 
+const ANALYSIS_PLAN = {
+  structuredDataPrompt: `Extract booking details from this call transcript. Return a JSON object with:
+- booking_confirmed: true only if customer clearly agreed to book and gave their details
+- customer_name: full name given by customer (null if not given)
+- customer_phone: phone number given by customer (null if not given)
+- appointment_date: date in YYYY-MM-DD format (null if not given)
+- appointment_time: time in HH:MM 24-hour format (null if not given)
+- service_type: service requested (null if not mentioned)
+If any required field is missing or booking was not confirmed, set booking_confirmed to false.`,
+  structuredDataSchema: {
+    type: 'object',
+    properties: {
+      booking_confirmed:  { type: 'boolean' },
+      customer_name:      { type: 'string' },
+      customer_phone:     { type: 'string' },
+      appointment_date:   { type: 'string' },
+      appointment_time:   { type: 'string' },
+      service_type:       { type: 'string' },
+    },
+  },
+};
+
 function buildBookingFunctions(userId) {
   return [
     {
@@ -83,14 +105,14 @@ router.post('/', async (req, res) => {
 
     const payload = {
       name: agent_name || 'New Agent',
-      serverUrl: `${BASE_URL}/api/vapi-tools/${req.user.userId}/call`,
+      serverUrl: `${BASE_URL}/webhook/vapi`,
       model: {
         provider: getModelProvider(modelChoice),
         model: modelChoice,
         systemPrompt: system_prompt || '',
         temperature: 0.7,
-        functions: buildBookingFunctions(req.user.userId),
       },
+      analysisPlan: ANALYSIS_PLAN,
       voice: {
         provider: voice_provider || '11labs',
         voiceId: voice_id || 'paula',
@@ -118,7 +140,8 @@ router.put('/:id', async (req, res) => {
     const modelChoice = req.body.model_id || 'gpt-4o-mini';
 
     const payload = {
-      serverUrl: `${BASE_URL}/api/vapi-tools/${req.user.userId}/call`,
+      serverUrl: `${BASE_URL}/webhook/vapi`,
+      analysisPlan: ANALYSIS_PLAN,
       responseDelaySeconds: 0,
     };
 
@@ -132,7 +155,6 @@ router.put('/:id', async (req, res) => {
         model: modelChoice,
         systemPrompt: system_prompt,
         temperature: 0.7,
-        functions: buildBookingFunctions(req.user.userId),
       };
     }
 

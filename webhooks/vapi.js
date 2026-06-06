@@ -121,22 +121,42 @@ router.post('/', async (req, res) => {
         }).catch(() => {});
       }
 
-      // FALLBACK: extract booking from transcript if bookAppointment tool wasn't called
+      // PRIMARY: Save booking from VAPI's analysisPlan structured data
       try {
-        const transcript = reportData.transcript || msg.transcript || '';
-        if (transcript && !bookingExistsForCall(normalized.call_id)) {
-          const booking = extractBookingFromTranscript(transcript, normalized.call_id);
-          if (booking) {
+        const analysis = reportData.analysis || msg.analysis || {};
+        const sd = analysis.structuredData || {};
+        console.log('[VAPI Webhook] Structured data:', JSON.stringify(sd));
+
+        if (sd.booking_confirmed && sd.appointment_date && sd.appointment_time
+            && sd.customer_name && sd.customer_phone
+            && !bookingExistsForCall(normalized.call_id)) {
+
+          // Validate date is not in past
+          const bookDate = new Date(sd.appointment_date);
+          const today = new Date(); today.setHours(0,0,0,0);
+
+          if (bookDate >= today) {
             db.prepare(`
               INSERT INTO appointments (user_id, customer_name, customer_phone, appointment_date, appointment_time, status, service_type, notes)
-              VALUES (?, ?, ?, ?, ?, 'confirmed', 'Service', ?)
-            `).run(userId, booking.name, booking.phone, booking.date, booking.time,
-              `Auto-extracted from call ${booking.callId}`);
-            console.log(`[VAPI Webhook] Fallback booking saved for ${booking.name} on ${booking.date} at ${booking.time}`);
+              VALUES (?, ?, ?, ?, ?, 'confirmed', ?, ?)
+            `).run(
+              userId,
+              sd.customer_name,
+              sd.customer_phone,
+              sd.appointment_date,
+              sd.appointment_time,
+              sd.service_type || 'Service',
+              `Booked via AI call — ${normalized.call_id}`
+            );
+            console.log(`[VAPI Webhook] ✅ Booking saved: ${sd.customer_name} on ${sd.appointment_date} at ${sd.appointment_time}`);
+          } else {
+            console.log('[VAPI Webhook] ⚠️ Skipped past date booking:', sd.appointment_date);
           }
+        } else {
+          console.log('[VAPI Webhook] No confirmed booking in this call. booking_confirmed:', sd.booking_confirmed);
         }
       } catch (e) {
-        console.error('[VAPI Webhook] Fallback booking error:', e.message);
+        console.error('[VAPI Webhook] Analysis booking error:', e.message);
       }
 
       if (ioInstance) {
