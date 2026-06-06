@@ -1,7 +1,71 @@
 const express = require('express');
-const { callQueries, userQueries } = require('../database/db');
+const { callQueries, userQueries, db } = require('../database/db');
 const { normalizeCallData } = require('../services/vapi');
 const { downloadRecording } = require('../services/sync');
+
+// Check if booking already saved for this call
+function bookingExistsForCall(callId) {
+  return db.prepare(`SELECT id FROM appointments WHERE notes LIKE ?`).get(`%${callId}%`);
+}
+
+// Parse transcript to extract booking details
+function extractBookingFromTranscript(transcript, callId) {
+  if (!transcript) return null;
+  const text = transcript.toLowerCase();
+
+  // Must contain confirmation keywords
+  const confirmed = /\b(booked|booking confirmed|all booked|locked in|see you|appointment.*confirm)\b/i.test(transcript);
+  if (!confirmed) return null;
+
+  // Extract date — look for YYYY-MM-DD or common date patterns
+  let date = null;
+  const isoDate = transcript.match(/\b(\d{4}-\d{2}-\d{2})\b/);
+  if (isoDate) {
+    date = isoDate[1];
+  } else {
+    // Try to find date like "10th of June", "June 10", "10 June 2026"
+    const monthMap = { jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12,
+      january:1,february:2,march:3,april:4,june:6,july:7,august:8,september:9,october:10,november:11,december:12 };
+    const m = transcript.match(/(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?(\w+)(?:\s+(\d{4}))?/i);
+    if (m) {
+      const day = parseInt(m[1]);
+      const mon = monthMap[m[2].toLowerCase()];
+      const year = m[3] ? parseInt(m[3]) : new Date().getFullYear();
+      if (mon) date = `${year}-${String(mon).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    }
+  }
+
+  // Extract time — HH:MM or "10am", "2pm", "10 o'clock"
+  let time = null;
+  const timeMatch = transcript.match(/\b(\d{1,2}):(\d{2})\b/);
+  if (timeMatch) {
+    time = `${String(parseInt(timeMatch[1])).padStart(2,'0')}:${timeMatch[2]}`;
+  } else {
+    const ampm = transcript.match(/\b(\d{1,2})\s*(am|pm)\b/i);
+    if (ampm) {
+      let h = parseInt(ampm[1]);
+      if (ampm[2].toLowerCase() === 'pm' && h < 12) h += 12;
+      if (ampm[2].toLowerCase() === 'am' && h === 12) h = 0;
+      time = `${String(h).padStart(2,'0')}:00`;
+    }
+  }
+
+  if (!date || !time) return null;
+
+  // Validate date is not in past
+  if (new Date(date) < new Date(new Date().toDateString())) return null;
+
+  // Extract phone number
+  const phoneMatch = transcript.match(/\b(\+?[\d\s\-]{8,15})\b/);
+  const phone = phoneMatch ? phoneMatch[1].replace(/\s/g, '') : 'Unknown';
+
+  // Extract name — look for "name is X" or "I'm X" patterns
+  const nameMatch = transcript.match(/(?:name is|my name'?s?|i'?m)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/i);
+  const name = nameMatch ? nameMatch[1] : 'Customer';
+
+  return { date, time, name, phone, callId };
+}
+
 
 const router = express.Router();
 let ioInstance = null;
@@ -55,6 +119,24 @@ router.post('/', async (req, res) => {
         downloadRecording(normalized.call_id, normalized.recording_url).then(p => {
           if (p) callQueries.updateRecordingPath.run(p, normalized.call_id);
         }).catch(() => {});
+      }
+
+      // FALLBACK: extract booking from transcript if bookAppointment tool wasn't called
+      try {
+        const transcript = reportData.transcript || msg.transcript || '';
+        if (transcript && !bookingExistsForCall(normalized.call_id)) {
+          const booking = extractBookingFromTranscript(transcript, normalized.call_id);
+          if (booking) {
+            db.prepare(`
+              INSERT INTO appointments (user_id, customer_name, customer_phone, appointment_date, appointment_time, status, service_type, notes)
+              VALUES (?, ?, ?, ?, ?, 'confirmed', 'Service', ?)
+            `).run(userId, booking.name, booking.phone, booking.date, booking.time,
+              `Auto-extracted from call ${booking.callId}`);
+            console.log(`[VAPI Webhook] Fallback booking saved for ${booking.name} on ${booking.date} at ${booking.time}`);
+          }
+        }
+      } catch (e) {
+        console.error('[VAPI Webhook] Fallback booking error:', e.message);
       }
 
       if (ioInstance) {
