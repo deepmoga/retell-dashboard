@@ -7,9 +7,10 @@ const router = express.Router();
 
 // Helper: parse VAPI tool call request
 function parseToolCall(body) {
-  // VAPI sends tool calls in this format
+  console.log('[VAPI Tool] Incoming body:', JSON.stringify(body).slice(0, 500));
   const msg = body.message || body;
   const toolCalls = msg.toolCallList || msg.tool_calls || [];
+  console.log('[VAPI Tool] Parsed toolCalls:', toolCalls.length);
   return toolCalls;
 }
 
