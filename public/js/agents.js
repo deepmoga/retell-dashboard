@@ -220,15 +220,35 @@ async function openEditAgentModal(agentId) {
     document.getElementById('f-name').value = a.name || '';
     document.getElementById('f-language').value = a.language || 'en-US';
     document.getElementById('f-begin-message').value = a.firstMessage || '';
-    document.getElementById('f-system-prompt').value = a.model?.systemPrompt || '';
+
+    // VAPI returns system prompt in multiple possible locations — check all
+    const systemPrompt =
+      a.model?.systemPrompt ||
+      a.model?.messages?.find(m => m.role === 'system')?.content ||
+      a.model?.prompt?.messages?.find(m => m.role === 'system')?.content ||
+      '';
+    document.getElementById('f-system-prompt').value = systemPrompt;
 
     const vp = a.voice?.provider || '11labs';
-    const vid = a.voice?.voiceId || 'paula';
+    const vid = a.voice?.voiceId || a.voice?.voice_id || 'paula';
     const vname = allVoices.find(v => v.provider === vp && v.voiceId === vid)?.name || vid;
     selectVoice(vp, vid, vname);
 
     const modelSel = document.getElementById('f-model-id');
-    if (modelSel && a.model?.model) modelSel.value = a.model.model;
+    const currentModel = a.model?.model || a.model?.modelId || 'gpt-4o-mini';
+    if (modelSel) {
+      // Try to set value, fallback to gpt-4o-mini if not found
+      modelSel.value = currentModel;
+      if (!modelSel.value) modelSel.value = 'gpt-4o-mini';
+    }
+
+    console.log('[Edit Agent] Loaded:', {
+      name: a.name,
+      model: currentModel,
+      voice: `${vp}/${vid}`,
+      systemPromptLength: systemPrompt.length,
+      firstMessage: a.firstMessage,
+    });
 
     switchTab('basic');
     openModal('agent-modal');
