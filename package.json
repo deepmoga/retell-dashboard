@@ -19,7 +19,8 @@
     "csv-parse": "^5.5.3",
     "dotenv": "^16.4.1",
     "cors": "^2.8.5",
-    "nodemailer": "^6.9.8"
+    "nodemailer": "^6.9.8",
+    "googleapis": "^140.0.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.3"

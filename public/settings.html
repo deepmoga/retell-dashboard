@@ -124,6 +124,44 @@
         </div>
       </div>
 
+      <!-- Google Calendar Card -->
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header">
+          <div class="card-title">📅 Google Calendar</div>
+          <span id="gcal-badge" style="font-size:11px;padding:2px 10px;border-radius:10px;background:var(--surface2);color:var(--text-muted)">Not Connected</span>
+        </div>
+        <div class="card-body">
+          <div id="gcal-disconnected">
+            <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px">
+              Connect your Google Calendar to automatically sync all appointments. Every AI-booked appointment will appear on your Google Calendar instantly.
+            </p>
+            <a href="/auth/google/connect" class="btn btn-primary" style="display:inline-flex;align-items:center;gap:8px">
+              <span>🔗</span> Connect Google Calendar
+            </a>
+          </div>
+          <div id="gcal-connected" style="display:none">
+            <div style="padding:12px;background:rgba(0,212,170,0.08);border:1px solid rgba(0,212,170,0.2);border-radius:6px;margin-bottom:16px;font-size:13px;color:var(--accent)">
+              ✅ Google Calendar connected!
+            </div>
+            <div class="form-group">
+              <label class="form-label">Select Calendar</label>
+              <select id="gcal-select" class="form-control"></select>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Appointments will be added to this calendar</div>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:12px">
+              <button class="btn btn-primary" onclick="saveCalendar()">💾 Save Calendar</button>
+              <button class="btn btn-danger" onclick="disconnectGoogle()">🔌 Disconnect</button>
+            </div>
+          </div>
+          <div style="margin-top:16px;padding:12px;background:var(--surface2);border-radius:6px;font-size:12px;color:var(--text-muted)">
+            <strong style="color:var(--text)">Setup required:</strong> Add these to your <code>.env</code> file on server:<br>
+            <code style="color:var(--accent)">GOOGLE_CLIENT_ID=your_client_id</code><br>
+            <code style="color:var(--accent)">GOOGLE_CLIENT_SECRET=your_client_secret</code><br>
+            <a href="https://console.cloud.google.com/" target="_blank" style="color:var(--accent)">→ Get credentials from Google Cloud Console</a>
+          </div>
+        </div>
+      </div>
+
       <!-- Profile Card -->
       <div class="card" style="margin-bottom:20px">
         <div class="card-header"><div class="card-title">👤 Profile</div></div>
@@ -173,8 +211,51 @@
 document.addEventListener('DOMContentLoaded', async () => {
   if (!requireAuth()) return;
   await loadProfile();
+  await loadGCalStatus();
   bindEvents();
+
+  // Handle OAuth callback params
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('gcal') === 'success') {
+    toast('Google Calendar connected! ✅', 'success');
+    history.replaceState({}, '', '/settings');
+    await loadGCalStatus();
+  } else if (params.get('gcal') === 'error') {
+    toast('Google Calendar connection failed. Check credentials.', 'error');
+    history.replaceState({}, '', '/settings');
+  }
 });
+
+async function loadGCalStatus() {
+  try {
+    const data = await apiGet('/auth/google/status');
+    const badge = document.getElementById('gcal-badge');
+    if (data.connected) {
+      if (badge) { badge.textContent = '✅ Connected'; badge.style.background = 'rgba(0,212,170,0.15)'; badge.style.color = 'var(--accent)'; }
+      document.getElementById('gcal-disconnected').style.display = 'none';
+      document.getElementById('gcal-connected').style.display = '';
+      const sel = document.getElementById('gcal-select');
+      sel.innerHTML = (data.calendars || []).map(c =>
+        `<option value="${escHtml(c.id)}" ${c.id === data.calendar_id ? 'selected' : ''}>${escHtml(c.name)}</option>`
+      ).join('');
+    }
+  } catch(e) {}
+}
+
+async function saveCalendar() {
+  try {
+    const id = document.getElementById('gcal-select').value;
+    await apiPost('/auth/google/calendar', { calendar_id: id });
+    toast('Calendar saved!', 'success');
+  } catch(e) { toast('Failed to save', 'error'); }
+}
+
+async function disconnectGoogle() {
+  if (!confirm('Disconnect Google Calendar?')) return;
+  await apiPost('/auth/google/disconnect', {});
+  toast('Disconnected', 'success');
+  location.reload();
+}
 
 async function loadProfile() {
   try {

@@ -132,6 +132,12 @@ db.exec(`
 // Run migrations immediately (before prepared statements below)
 try { db.exec(`ALTER TABLE users ADD COLUMN vapi_api_key TEXT`); } catch (e) { /* already exists */ }
 
+// Google Calendar columns
+try { db.exec(`ALTER TABLE users ADD COLUMN google_access_token TEXT`); } catch(e) {}
+try { db.exec(`ALTER TABLE users ADD COLUMN google_refresh_token TEXT`); } catch(e) {}
+try { db.exec(`ALTER TABLE users ADD COLUMN google_calendar_id TEXT DEFAULT 'primary'`); } catch(e) {}
+try { db.exec(`ALTER TABLE appointments ADD COLUMN google_event_id TEXT`); } catch(e) {}
+
 // Function call logs table
 try {
   db.exec(`CREATE TABLE IF NOT EXISTS function_logs (

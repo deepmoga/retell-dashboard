@@ -102,6 +102,21 @@
         </div>
       </div>
 
+      <!-- Google Calendar Embed -->
+      <div id="gcal-embed-card" class="card" style="margin-top:20px;display:none">
+        <div class="card-header">
+          <div class="card-title">📅 Google Calendar</div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-ghost btn-sm" onclick="toggleCalView('month')">Month</button>
+            <button class="btn btn-ghost btn-sm" onclick="toggleCalView('week')">Week</button>
+            <button class="btn btn-ghost btn-sm" onclick="toggleCalView('agenda')">Agenda</button>
+          </div>
+        </div>
+        <div class="card-body" style="padding:0;height:550px">
+          <iframe id="gcal-iframe" src="" style="width:100%;height:100%;border:none;border-radius:0 0 8px 8px"></iframe>
+        </div>
+      </div>
+
       <!-- Available Slots Preview -->
       <div class="card" style="margin-top:20px">
         <div class="card-header">
@@ -214,11 +229,33 @@
 <script>
 const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 
+let gcalView = 'month';
+
 document.addEventListener('DOMContentLoaded', async () => {
   if (!requireAuth()) return;
-  await Promise.all([loadAppointments(), loadSlots(), loadStats()]);
+  await Promise.all([loadAppointments(), loadSlots(), loadStats(), loadGCal()]);
   bindEvents();
 });
+
+async function loadGCal() {
+  try {
+    const data = await apiGet('/auth/google/status');
+    if (!data.connected) return;
+    const calId = encodeURIComponent(data.calendar_id || 'primary');
+    const card = document.getElementById('gcal-embed-card');
+    const iframe = document.getElementById('gcal-iframe');
+    if (card && iframe) {
+      card.style.display = '';
+      iframe.src = `https://calendar.google.com/calendar/embed?src=${calId}&mode=MONTH&showTitle=0&showNav=1&showDate=1&showPrint=0&showTabs=0&showCalendars=0&color=%2300d4aa`;
+    }
+  } catch(e) {}
+}
+
+function toggleCalView(mode) {
+  const iframe = document.getElementById('gcal-iframe');
+  if (!iframe || !iframe.src) return;
+  iframe.src = iframe.src.replace(/mode=[A-Z]+/, `mode=${mode.toUpperCase()}`);
+}
 
 async function loadStats() {
   try {
