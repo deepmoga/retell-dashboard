@@ -52,6 +52,13 @@ jobs:
             echo ">>> PM2 Status:"
             pm2 list
 
+            echo ">>> Cleaning test bookings from DB..."
+            node -e "
+              const { db } = require('./database/db');
+              const deleted = db.prepare(\"DELETE FROM appointments WHERE customer_name = 'Test Ravish' OR notes LIKE '%test%'\").run();
+              console.log('Deleted test records:', deleted.changes);
+            " || true
+
             echo ">>> Testing API route locally:"
             curl -s -o /dev/null -w "GET /api/agents HTTP status: %{http_code}\n" http://localhost:3000/api/agents || echo "curl failed"
 

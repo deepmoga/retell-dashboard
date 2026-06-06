@@ -103,8 +103,10 @@ function handleCheckAvailability(userId, args, res, toolCallId) {
 
 function handleBookAppointment(userId, args, res, toolCallId) {
   try {
+    console.log('[bookAppointment] Args received:', JSON.stringify(args));
     const { date, time, customer_name, customer_phone, service_type } = args;
     if (!date || !time || !customer_name || !customer_phone) {
+      console.log('[bookAppointment] Missing fields:', { date, time, customer_name, customer_phone });
       return sendResult(res, toolCallId, 'Missing details. Need date, time, customer name and phone number.');
     }
 
