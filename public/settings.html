@@ -135,9 +135,9 @@
             <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px">
               Connect your Google Calendar to automatically sync all appointments. Every AI-booked appointment will appear on your Google Calendar instantly.
             </p>
-            <a href="/auth/google/connect" class="btn btn-primary" style="display:inline-flex;align-items:center;gap:8px">
+            <button onclick="connectGoogle()" class="btn btn-primary" style="display:inline-flex;align-items:center;gap:8px">
               <span>🔗</span> Connect Google Calendar
-            </a>
+            </button>
           </div>
           <div id="gcal-connected" style="display:none">
             <div style="padding:12px;background:rgba(0,212,170,0.08);border:1px solid rgba(0,212,170,0.2);border-radius:6px;margin-bottom:16px;font-size:13px;color:var(--accent)">
@@ -248,6 +248,11 @@ async function saveCalendar() {
     await apiPost('/auth/google/calendar', { calendar_id: id });
     toast('Calendar saved!', 'success');
   } catch(e) { toast('Failed to save', 'error'); }
+}
+
+function connectGoogle() {
+  const token = getToken();
+  window.location.href = `/auth/google/connect?token=${token}`;
 }
 
 async function disconnectGoogle() {
