@@ -18,46 +18,41 @@ function getModelProvider(modelChoice) {
     ? 'groq' : 'openai';
 }
 
-// Build booking tools — TOP LEVEL (not inside model)
-function buildTools(userId) {
-  return [
-    {
-      type: 'function',
-      function: {
-        name: 'checkAvailability',
-        description: 'Check if a date and time slot is available for booking an appointment',
-        parameters: {
-          type: 'object',
-          properties: {
-            date: { type: 'string', description: 'Date in YYYY-MM-DD format e.g. 2024-12-25' },
-            time: { type: 'string', description: 'Time in HH:MM 24-hour format e.g. 10:00 or 14:30' },
-          },
-          required: ['date', 'time'],
-        },
-      },
-      server: { url: `${BASE_URL}/api/vapi-tools/${userId}/check-availability` },
-    },
-    {
-      type: 'function',
-      function: {
-        name: 'bookAppointment',
-        description: 'Save a confirmed appointment booking into the system',
-        parameters: {
-          type: 'object',
-          properties: {
-            date:           { type: 'string', description: 'Date in YYYY-MM-DD format' },
-            time:           { type: 'string', description: 'Time in HH:MM 24-hour format' },
-            customer_name:  { type: 'string', description: 'Full name of the customer' },
-            customer_phone: { type: 'string', description: 'Customer phone number' },
-            service_type:   { type: 'string', description: 'Type of service being booked' },
-          },
-          required: ['date', 'time', 'customer_name', 'customer_phone'],
-        },
-      },
-      server: { url: `${BASE_URL}/api/vapi-tools/${userId}/book-appointment` },
-    },
-  ];
+// VAPI serverUrl approach — single webhook handles all function calls
+function getServerUrl(userId) {
+  return `${BASE_URL}/api/vapi-tools/${userId}/call`;
 }
+
+// Function definitions for booking (no server URL per function — serverUrl handles all)
+const BOOKING_FUNCTIONS = [
+  {
+    name: 'checkAvailability',
+    description: 'Check if a date and time slot is available for booking an appointment',
+    parameters: {
+      type: 'object',
+      properties: {
+        date: { type: 'string', description: 'Date in YYYY-MM-DD format e.g. 2024-12-25' },
+        time: { type: 'string', description: 'Time in HH:MM 24-hour format e.g. 10:00 or 14:30' },
+      },
+      required: ['date', 'time'],
+    },
+  },
+  {
+    name: 'bookAppointment',
+    description: 'Save a confirmed appointment booking into the system',
+    parameters: {
+      type: 'object',
+      properties: {
+        date:           { type: 'string', description: 'Date in YYYY-MM-DD format' },
+        time:           { type: 'string', description: 'Time in HH:MM 24-hour format' },
+        customer_name:  { type: 'string', description: 'Full name of the customer' },
+        customer_phone: { type: 'string', description: 'Customer phone number' },
+        service_type:   { type: 'string', description: 'Type of service being booked' },
+      },
+      required: ['date', 'time', 'customer_name', 'customer_phone'],
+    },
+  },
+];
 
 router.get('/', async (req, res) => {
   try {
@@ -90,13 +85,14 @@ router.post('/', async (req, res) => {
 
     const payload = {
       name: agent_name || 'New Agent',
+      serverUrl: getServerUrl(req.user.userId),
       model: {
         provider: getModelProvider(modelChoice),
         model: modelChoice,
         systemPrompt: system_prompt || '',
         temperature: 0.7,
+        functions: BOOKING_FUNCTIONS,
       },
-      tools: buildTools(req.user.userId),   // ← TOP LEVEL (correct)
       voice: {
         provider: voice_provider || '11labs',
         voiceId: voice_id || 'paula',
@@ -110,7 +106,10 @@ router.post('/', async (req, res) => {
     const agent = await vapi.createAssistant(apiKey, payload);
     res.json({ agent });
   } catch (err) {
-    res.status(500).json({ error: err.response?.data?.message || err.message });
+    const vapiError = err.response?.data;
+    console.error('[Agents POST] Error:', JSON.stringify(vapiError || err.message));
+    const msg = vapiError?.message || (Array.isArray(vapiError) ? JSON.stringify(vapiError) : null) || err.message;
+    res.status(500).json({ error: msg });
   }
 });
 
@@ -120,24 +119,25 @@ router.put('/:id', async (req, res) => {
     const { agent_name, voice_provider, voice_id, language, first_message, system_prompt } = req.body;
     const modelChoice = req.body.model_id || 'gpt-4o-mini';
 
-    // Always include tools on update so they get re-attached correctly
     const payload = {
+      serverUrl: getServerUrl(req.user.userId),
       responseDelaySeconds: 0,
-      llmRequestDelaySeconds: 0,
-      tools: buildTools(req.user.userId),   // ← always re-attach tools on save
     };
 
     if (agent_name !== undefined) payload.name = agent_name;
     if (first_message !== undefined) payload.firstMessage = first_message;
     if (language !== undefined) payload.language = language;
+
     if (system_prompt !== undefined) {
       payload.model = {
         provider: getModelProvider(modelChoice),
         model: modelChoice,
         systemPrompt: system_prompt,
         temperature: 0.7,
+        functions: BOOKING_FUNCTIONS,
       };
     }
+
     if (voice_provider !== undefined || voice_id !== undefined) {
       payload.voice = {
         provider: voice_provider || '11labs',
@@ -150,7 +150,7 @@ router.put('/:id', async (req, res) => {
   } catch (err) {
     const vapiError = err.response?.data;
     console.error('[Agents PUT] Error:', JSON.stringify(vapiError || err.message));
-    const msg = vapiError?.message || vapiError?.error || (Array.isArray(vapiError) ? JSON.stringify(vapiError) : null) || err.message;
+    const msg = vapiError?.message || (Array.isArray(vapiError) ? JSON.stringify(vapiError) : null) || err.message;
     res.status(500).json({ error: msg });
   }
 });
