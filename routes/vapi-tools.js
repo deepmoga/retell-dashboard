@@ -5,6 +5,13 @@ const { db } = require('../database/db');
 
 const router = express.Router();
 
+function saveLog(userId, fnName, args, result, status = 'success', callId = '') {
+  try {
+    db.prepare(`INSERT INTO function_logs (user_id, function_name, args_json, result, status, call_id)
+      VALUES (?, ?, ?, ?, ?, ?)`).run(userId, fnName, JSON.stringify(args), result, status, callId || '');
+  } catch(e) { console.error('[Log] Failed to save log:', e.message); }
+}
+
 // Unified handler — VAPI serverUrl approach
 router.post('/:userId/call', (req, res) => {
   try {
@@ -71,6 +78,7 @@ function handleCheckAvailability(userId, args, res, toolCallId) {
   try {
     const { date, time } = args;
     if (!date || !time) {
+      saveLog(userId, 'checkAvailability', args, 'ERROR: missing date or time', 'error');
       return sendResult(res, toolCallId, 'Please provide both date and time.');
     }
 
@@ -87,11 +95,15 @@ function handleCheckAvailability(userId, args, res, toolCallId) {
       `).all(userId, date).map(r => r.appointment_time);
 
       const available = generateSlots().filter(s => !booked.includes(s)).slice(0, 3).join(', ');
+      const result = `BOOKED: Slot ${time} on ${formatDate(date)} is already booked. Available: ${available || 'none'}`;
+      saveLog(userId, 'checkAvailability', args, result, 'already_booked');
       return sendResult(res, toolCallId,
         `Slot ${time} on ${formatDate(date)} is already booked. Available slots: ${available || 'No slots available that day'}`
       );
     }
 
+    const result = `AVAILABLE: Slot ${time} on ${formatDate(date)}`;
+    saveLog(userId, 'checkAvailability', args, result, 'available');
     return sendResult(res, toolCallId,
       `Slot ${time} on ${formatDate(date)} is available.`
     );
@@ -105,8 +117,10 @@ function handleBookAppointment(userId, args, res, toolCallId) {
   try {
     console.log('[bookAppointment] Args received:', JSON.stringify(args));
     const { date, time, customer_name, customer_phone, service_type } = args;
+
     if (!date || !time || !customer_name || !customer_phone) {
-      console.log('[bookAppointment] Missing fields:', { date, time, customer_name, customer_phone });
+      const missing = { date, time, customer_name, customer_phone };
+      saveLog(userId, 'bookAppointment', args, `ERROR: missing fields ${JSON.stringify(missing)}`, 'error');
       return sendResult(res, toolCallId, 'Missing details. Need date, time, customer name and phone number.');
     }
 
@@ -117,6 +131,7 @@ function handleBookAppointment(userId, args, res, toolCallId) {
     `).get(userId, date, time);
 
     if (existing) {
+      saveLog(userId, 'bookAppointment', args, `CONFLICT: slot ${date} ${time} already taken`, 'conflict');
       return sendResult(res, toolCallId,
         `Sorry, slot ${time} on ${date} just got booked. Please choose another time.`
       );
@@ -128,6 +143,7 @@ function handleBookAppointment(userId, args, res, toolCallId) {
     `).run(userId, customer_name, customer_phone, date, time, service_type || 'Consultation');
 
     const bookingId = result.lastInsertRowid;
+    saveLog(userId, 'bookAppointment', args, `SUCCESS: Booking #${bookingId} saved`, 'success');
     console.log(`[bookAppointment] Saved booking #${bookingId} for user ${userId}`);
 
     return sendResult(res, toolCallId,

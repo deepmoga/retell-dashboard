@@ -131,6 +131,20 @@ db.exec(`
 
 // Run migrations immediately (before prepared statements below)
 try { db.exec(`ALTER TABLE users ADD COLUMN vapi_api_key TEXT`); } catch (e) { /* already exists */ }
+
+// Function call logs table
+try {
+  db.exec(`CREATE TABLE IF NOT EXISTS function_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    function_name TEXT,
+    args_json TEXT,
+    result TEXT,
+    status TEXT DEFAULT 'success',
+    call_id TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+} catch(e) {}
 // New table migrations — safe to re-run
 try { db.exec(`CREATE TABLE IF NOT EXISTS appointments (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, call_id TEXT, customer_name TEXT, customer_phone TEXT, customer_email TEXT, appointment_date TEXT NOT NULL, appointment_time TEXT NOT NULL, duration_minutes INTEGER DEFAULT 30, status TEXT DEFAULT 'pending', service_type TEXT, notes TEXT, confirmation_sent INTEGER DEFAULT 0, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`); } catch(e) {}
 try { db.exec(`CREATE TABLE IF NOT EXISTS working_hours (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, day_of_week INTEGER NOT NULL, is_open INTEGER DEFAULT 1, start_time TEXT DEFAULT '09:00', end_time TEXT DEFAULT '17:00', slot_duration INTEGER DEFAULT 30)`); } catch(e) {}

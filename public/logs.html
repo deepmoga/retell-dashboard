@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Function Logs — VoiceAgent</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">V</div>
+      <div><div class="logo-text">VoiceAgent</div><div class="logo-sub">Dashboard</div></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Main</div>
+      <a class="nav-item" href="/dashboard" data-page="dashboard"><span class="nav-icon">📊</span><span class="nav-label">Dashboard</span></a>
+      <a class="nav-item" href="/agents" data-page="agents"><span class="nav-icon">🤖</span><span class="nav-label">Agent Builder</span></a>
+      <a class="nav-item" href="/calls" data-page="calls"><span class="nav-icon">📞</span><span class="nav-label">Call Logs</span></a>
+      <a class="nav-item" href="/live" data-page="live"><span class="nav-icon">🔴</span><span class="nav-label">Live Calls</span></a>
+      <a class="nav-item" href="/appointments" data-page="appointments"><span class="nav-icon">📅</span><span class="nav-label">Appointments</span></a>
+      <a class="nav-item" href="/leads" data-page="leads"><span class="nav-icon">👥</span><span class="nav-label">Leads</span></a>
+      <a class="nav-item" href="/costs" data-page="costs"><span class="nav-icon">💰</span><span class="nav-label">Cost Tracker</span></a>
+      <a class="nav-item" href="/logs" data-page="logs"><span class="nav-icon">🔍</span><span class="nav-label">Function Logs</span></a>
+      <div class="nav-section">Account</div>
+      <a class="nav-item" href="/settings" data-page="settings"><span class="nav-icon">🔑</span><span class="nav-label">Settings</span></a>
+      <div class="nav-section" data-admin-only>Admin</div>
+      <a class="nav-item" href="/clients" data-page="clients" data-admin-only><span class="nav-icon">⚙️</span><span class="nav-label">Clients</span></a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar" id="sidebar-user-avatar">A</div>
+        <div><div class="user-name" id="sidebar-user-name">Loading...</div><div class="user-role" id="sidebar-user-role"></div></div>
+      </div>
+      <button id="logout-btn" class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:10px">🚪 Logout</button>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <div class="page-header">
+      <div>
+        <div class="page-title">🔍 Function Logs</div>
+        <div class="page-sub">Live debug log — every checkAvailability and bookAppointment call</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-secondary" onclick="loadLogs()">↻ Refresh</button>
+        <button class="btn btn-danger" onclick="clearLogs()">🗑 Clear Logs</button>
+      </div>
+    </div>
+
+    <div class="page-body">
+      <!-- Stats -->
+      <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:20px">
+        <div class="stat-card accent">
+          <div class="stat-label">Total Calls</div>
+          <div class="stat-value" id="stat-total">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Availability Checks</div>
+          <div class="stat-value" id="stat-checks">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Bookings Saved ✅</div>
+          <div class="stat-value" id="stat-booked" style="color:var(--accent)">—</div>
+        </div>
+        <div class="stat-card danger">
+          <div class="stat-label">Errors ❌</div>
+          <div class="stat-value" id="stat-errors">—</div>
+        </div>
+      </div>
+
+      <!-- Logs Table -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Recent Function Calls</div>
+          <div style="font-size:12px;color:var(--text-muted)">Auto-refreshes every 10s during active calls</div>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Function</th>
+                <th>Date / Time</th>
+                <th>Customer</th>
+                <th>Status</th>
+                <th>Result</th>
+              </tr>
+            </thead>
+            <tbody id="logs-tbody">
+              <tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text-muted)">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="/js/app.js"></script>
+<script>
+let autoRefresh;
+
+document.addEventListener('DOMContentLoaded', async () => {
+  if (!requireAuth()) return;
+  await loadLogs();
+  autoRefresh = setInterval(loadLogs, 10000);
+});
+
+async function loadLogs() {
+  try {
+    const data = await apiGet('/logs?limit=100');
+    renderLogs(data.logs || []);
+  } catch(err) {
+    console.error(err);
+  }
+}
+
+function renderLogs(logs) {
+  const tbody = document.getElementById('logs-tbody');
+
+  const total = logs.length;
+  const checks = logs.filter(l => l.function_name === 'checkAvailability').length;
+  const booked = logs.filter(l => l.status === 'success' && l.function_name === 'bookAppointment').length;
+  const errors = logs.filter(l => l.status === 'error').length;
+
+  document.getElementById('stat-total').textContent = total;
+  document.getElementById('stat-checks').textContent = checks;
+  document.getElementById('stat-booked').textContent = booked;
+  document.getElementById('stat-errors').textContent = errors;
+
+  if (!logs.length) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text-muted)">
+      No logs yet — make a test call to see function calls here
+    </td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = logs.map(log => {
+    let args = {};
+    try { args = JSON.parse(log.args_json || '{}'); } catch(_) {}
+
+    const statusBadge = {
+      success:      '<span class="badge" style="background:rgba(0,212,170,0.15);color:var(--accent)">✅ Success</span>',
+      available:    '<span class="badge" style="background:rgba(0,212,170,0.15);color:var(--accent)">✅ Available</span>',
+      already_booked: '<span class="badge" style="background:rgba(243,156,18,0.15);color:var(--warning)">⚠️ Already Booked</span>',
+      conflict:     '<span class="badge" style="background:rgba(231,76,60,0.15);color:var(--danger)">❌ Conflict</span>',
+      error:        '<span class="badge" style="background:rgba(231,76,60,0.15);color:var(--danger)">❌ Error</span>',
+    }[log.status] || `<span class="badge">${log.status}</span>`;
+
+    const fnBadge = log.function_name === 'bookAppointment'
+      ? '<span style="color:#a78bfa;font-weight:600">📋 bookAppointment</span>'
+      : '<span style="color:var(--accent)">🔍 checkAvailability</span>';
+
+    const dateTime = args.date && args.time
+      ? `<div style="font-weight:600">${args.date}</div><div style="color:var(--text-muted);font-size:11px">${args.time}</div>`
+      : '<span style="color:var(--text-dim)">—</span>';
+
+    const customer = args.customer_name
+      ? `<div style="font-weight:600">${escHtml(args.customer_name)}</div><div style="color:var(--text-muted);font-size:11px">${escHtml(args.customer_phone||'')}</div>`
+      : '<span style="color:var(--text-dim)">—</span>';
+
+    const shortResult = (log.result || '').slice(0, 80) + ((log.result || '').length > 80 ? '...' : '');
+
+    return `<tr>
+      <td style="font-size:11px;color:var(--text-muted);white-space:nowrap">${new Date(log.created_at).toLocaleString()}</td>
+      <td>${fnBadge}</td>
+      <td>${dateTime}</td>
+      <td>${customer}</td>
+      <td>${statusBadge}</td>
+      <td style="font-size:11px;color:var(--text-muted);max-width:200px">${escHtml(shortResult)}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function clearLogs() {
+  if (!confirm('Clear all logs?')) return;
+  await apiDelete('/logs/clear');
+  await loadLogs();
+  toast('Logs cleared', 'success');
+}
+</script>
+</body>
+</html>
