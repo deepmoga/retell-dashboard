@@ -50,10 +50,23 @@
     </div>
 
     <div class="page-body">
+      <!-- Conflict Alert -->
+      <div id="conflict-banner" style="display:none;margin-bottom:16px;padding:14px 18px;background:rgba(231,76,60,0.1);border:1px solid rgba(231,76,60,0.4);border-radius:8px;display:none;align-items:center;gap:12px">
+        <span style="font-size:22px">⚠️</span>
+        <div style="flex:1">
+          <div style="font-weight:600;color:var(--danger)">Booking Conflicts Detected!</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:2px">
+            <span id="conflict-count">0</span> bookings have time conflicts — same slot booked by multiple customers. Review and resolve below.
+          </div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('filter-status').value='pending';loadAppointments()">View Conflicts</button>
+      </div>
+
       <!-- Stats -->
       <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:20px">
         <div class="stat-card accent"><div class="stat-label">Today</div><div class="stat-value" id="stat-today">—</div></div>
         <div class="stat-card"><div class="stat-label">This Week</div><div class="stat-value" id="stat-week">—</div></div>
+        <div class="stat-card danger"><div class="stat-label">⚠️ Conflicts</div><div class="stat-value" id="stat-conflicts">—</div></div>
         <div class="stat-card"><div class="stat-label">Pending</div><div class="stat-value" id="stat-pending">—</div></div>
         <div class="stat-card"><div class="stat-label">Confirmed</div><div class="stat-value" id="stat-confirmed">—</div></div>
       </div>
@@ -219,6 +232,22 @@ async function loadStats() {
     document.getElementById('stat-week').textContent = appts.filter(a => a.appointment_date >= today && a.appointment_date <= weekStr && a.status !== 'cancelled').length;
     document.getElementById('stat-pending').textContent = appts.filter(a => a.status === 'pending').length;
     document.getElementById('stat-confirmed').textContent = appts.filter(a => a.status === 'confirmed').length;
+
+    // Detect conflicts — pending bookings with CONFLICT in notes
+    const conflicts = appts.filter(a => a.status === 'pending' && a.notes && a.notes.includes('CONFLICT'));
+    const conflictStat = document.getElementById('stat-conflicts');
+    if (conflictStat) conflictStat.textContent = conflicts.length;
+
+    const banner = document.getElementById('conflict-banner');
+    if (banner) {
+      if (conflicts.length > 0) {
+        banner.style.display = 'flex';
+        const countEl = document.getElementById('conflict-count');
+        if (countEl) countEl.textContent = conflicts.length;
+      } else {
+        banner.style.display = 'none';
+      }
+    }
   } catch(e) {}
 }
 
@@ -244,24 +273,37 @@ function renderTable(appts) {
     return;
   }
   const statusColors = { confirmed:'qualified', pending:'callback', completed:'inbound', cancelled:'not_interested' };
-  tbody.innerHTML = appts.map(a => `
-    <tr>
-      <td><strong>${escHtml(a.customer_name || '—')}</strong></td>
+  tbody.innerHTML = appts.map(a => {
+    const isConflict = a.status === 'pending' && a.notes && a.notes.includes('CONFLICT');
+    const rowStyle = isConflict ? 'background:rgba(231,76,60,0.06);border-left:3px solid var(--danger)' : '';
+    const conflictNote = isConflict
+      ? `<div style="font-size:10px;color:var(--danger);margin-top:3px">⚠️ ${escHtml((a.notes||'').split('CONFLICT —')[1]?.split('.')[0]?.trim() || 'Time conflict')}</div>`
+      : '';
+    return `
+    <tr style="${rowStyle}">
+      <td>
+        <strong>${escHtml(a.customer_name || '—')}</strong>
+        ${conflictNote}
+      </td>
       <td style="font-family:monospace">${escHtml(a.customer_phone || '—')}</td>
       <td>${escHtml(a.appointment_date)}</td>
       <td><strong>${escHtml(a.appointment_time)}</strong></td>
       <td>${escHtml(a.service_type || '—')}</td>
-      <td>${badge(a.status, statusColors[a.status] || 'ended')}</td>
+      <td>
+        ${isConflict
+          ? '<span class="badge" style="background:rgba(231,76,60,0.15);color:var(--danger)">⚠️ Conflict</span>'
+          : badge(a.status, statusColors[a.status] || 'ended')}
+      </td>
       <td>${a.confirmation_sent ? '<span style="color:var(--accent)">✓ Sent</span>' : '<span style="color:var(--text-muted)">—</span>'}</td>
       <td>
         <div class="table-actions">
-          ${a.customer_email && !a.confirmation_sent ? `<button class="btn btn-ghost btn-sm" onclick="resendEmail(${a.id})" title="Send Email">📧</button>` : ''}
-          ${a.status !== 'cancelled' ? `<button class="btn btn-ghost btn-sm" onclick="completeAppt(${a.id})" title="Mark Complete">✅</button>` : ''}
+          ${isConflict ? `<button class="btn btn-primary btn-sm" onclick="confirmAppt(${a.id})" title="Confirm this booking">✅ Confirm</button>` : ''}
+          ${!isConflict && a.status !== 'cancelled' ? `<button class="btn btn-ghost btn-sm" onclick="completeAppt(${a.id})" title="Mark Complete">✅</button>` : ''}
           <button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="cancelAppt(${a.id})" title="Cancel">✕</button>
         </div>
       </td>
-    </tr>
-  `).join('');
+    </tr>`;
+  }).join('');
 }
 
 async function loadSlots() {
@@ -288,6 +330,14 @@ async function resendEmail(id) {
     const r = await apiPost(`/appointments/${id}/send-confirmation`, {});
     toast(r.message, r.success ? 'success' : 'error');
     if (r.success) loadAppointments();
+  } catch(err) { toast('Failed: ' + err.message, 'error'); }
+}
+
+async function confirmAppt(id) {
+  try {
+    await apiPut(`/appointments/${id}`, { status: 'confirmed' });
+    toast('Booking confirmed! ✅', 'success');
+    loadAppointments(); loadStats();
   } catch(err) { toast('Failed: ' + err.message, 'error'); }
 }
 

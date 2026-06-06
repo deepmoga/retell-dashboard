@@ -136,19 +136,41 @@ router.post('/', async (req, res) => {
           const today = new Date(); today.setHours(0,0,0,0);
 
           if (bookDate >= today) {
+            // Check if slot already taken
+            const slotTaken = db.prepare(`
+              SELECT id, customer_name FROM appointments
+              WHERE user_id = ? AND appointment_date = ? AND appointment_time = ?
+              AND status = 'confirmed'
+            `).get(userId, sd.appointment_date, sd.appointment_time);
+
+            const status = slotTaken ? 'pending' : 'confirmed';
+            const notes = slotTaken
+              ? `⚠️ CONFLICT — slot already booked by ${slotTaken.customer_name}. Booked via AI call — ${normalized.call_id}`
+              : `Booked via AI call — ${normalized.call_id}`;
+
             db.prepare(`
               INSERT INTO appointments (user_id, customer_name, customer_phone, appointment_date, appointment_time, status, service_type, notes)
-              VALUES (?, ?, ?, ?, ?, 'confirmed', ?, ?)
-            `).run(
-              userId,
-              sd.customer_name,
-              sd.customer_phone,
-              sd.appointment_date,
-              sd.appointment_time,
-              sd.service_type || 'Service',
-              `Booked via AI call — ${normalized.call_id}`
-            );
-            console.log(`[VAPI Webhook] ✅ Booking saved: ${sd.customer_name} on ${sd.appointment_date} at ${sd.appointment_time}`);
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            `).run(userId, sd.customer_name, sd.customer_phone, sd.appointment_date, sd.appointment_time,
+              status, sd.service_type || 'Service', notes);
+
+            if (slotTaken) {
+              console.log(`[VAPI Webhook] ⚠️ CONFLICT: ${sd.customer_name} vs ${slotTaken.customer_name} on ${sd.appointment_date} ${sd.appointment_time}`);
+            } else {
+              console.log(`[VAPI Webhook] ✅ Booking saved: ${sd.customer_name} on ${sd.appointment_date} at ${sd.appointment_time}`);
+            }
+
+            // Emit socket event for real-time dashboard notification
+            if (ioInstance) {
+              ioInstance.emit('new_appointment', {
+                customer_name: sd.customer_name,
+                date: sd.appointment_date,
+                time: sd.appointment_time,
+                status,
+                conflict: !!slotTaken,
+                conflictWith: slotTaken?.customer_name || null,
+              });
+            }
           } else {
             console.log('[VAPI Webhook] ⚠️ Skipped past date booking:', sd.appointment_date);
           }
