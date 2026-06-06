@@ -100,13 +100,10 @@ router.post('/', async (req, res) => {
       voice: {
         provider: voice_provider || '11labs',
         voiceId: voice_id || 'paula',
-        speed: 1.1,
       },
       firstMessage: first_message || '',
       language: language || 'en-US',
       responseDelaySeconds: 0,
-      llmRequestDelaySeconds: 0,
-      backgroundDenoisingEnabled: false,
       firstMessageMode: 'assistant-speaks-first',
     };
 
@@ -145,14 +142,16 @@ router.put('/:id', async (req, res) => {
       payload.voice = {
         provider: voice_provider || '11labs',
         voiceId: voice_id || 'paula',
-        speed: 1.1,
       };
     }
 
     await vapi.updateAssistant(apiKey, req.params.id, payload);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.response?.data?.message || err.message });
+    const vapiError = err.response?.data;
+    console.error('[Agents PUT] Error:', JSON.stringify(vapiError || err.message));
+    const msg = vapiError?.message || vapiError?.error || (Array.isArray(vapiError) ? JSON.stringify(vapiError) : null) || err.message;
+    res.status(500).json({ error: msg });
   }
 });
 
