@@ -168,6 +168,8 @@ try { db.exec(`ALTER TABLE function_logs ADD COLUMN raw_request TEXT`); } catch(
 try { db.exec(`ALTER TABLE function_logs ADD COLUMN response_sent TEXT`); } catch(e) {}
 try { db.exec(`ALTER TABLE users ADD COLUMN timezone TEXT DEFAULT 'Australia/Sydney'`); } catch(e) {}
 try { db.exec(`ALTER TABLE users ADD COLUMN plan_id INTEGER`); } catch(e) {}
+try { db.exec(`ALTER TABLE users ADD COLUMN plan_start_date TEXT`); } catch(e) {}
+try { db.exec(`ALTER TABLE users ADD COLUMN plan_expiry_date TEXT`); } catch(e) {}
 // New table migrations — safe to re-run
 try { db.exec(`CREATE TABLE IF NOT EXISTS appointments (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, call_id TEXT, customer_name TEXT, customer_phone TEXT, customer_email TEXT, appointment_date TEXT NOT NULL, appointment_time TEXT NOT NULL, duration_minutes INTEGER DEFAULT 30, status TEXT DEFAULT 'pending', service_type TEXT, notes TEXT, confirmation_sent INTEGER DEFAULT 0, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`); } catch(e) {}
 try { db.exec(`CREATE TABLE IF NOT EXISTS working_hours (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, day_of_week INTEGER NOT NULL, is_open INTEGER DEFAULT 1, start_time TEXT DEFAULT '09:00', end_time TEXT DEFAULT '17:00', slot_duration INTEGER DEFAULT 30)`); } catch(e) {}
@@ -218,7 +220,7 @@ function seedAdmin() {
 const userQueries = {
   findByEmail: db.prepare('SELECT * FROM users WHERE email = ?'),
   findById: db.prepare('SELECT id, name, email, role, company_name, logo_url, retell_api_key, vapi_api_key, twilio_account_sid, twilio_auth_token, created_at FROM users WHERE id = ?'),
-  findAll: db.prepare('SELECT id, name, email, role, company_name, plan_id, created_at FROM users ORDER BY created_at DESC'),
+  findAll: db.prepare('SELECT id, name, email, role, company_name, plan_id, plan_start_date, plan_expiry_date, created_at FROM users ORDER BY created_at DESC'),
   create: db.prepare(`
     INSERT INTO users (name, email, password, role, company_name, retell_api_key, twilio_account_sid, twilio_auth_token)
     VALUES (@name, @email, @password, @role, @company_name, @retell_api_key, @twilio_account_sid, @twilio_auth_token)
@@ -398,22 +400,38 @@ const planQueries = {
   create:    db.prepare(`INSERT INTO plans (name, call_limit, price_aud, overage_rate, features) VALUES (@name, @call_limit, @price_aud, @overage_rate, @features)`),
   update:    db.prepare(`UPDATE plans SET name=@name, call_limit=@call_limit, price_aud=@price_aud, overage_rate=@overage_rate, features=@features WHERE id=@id`),
   delete:    db.prepare('DELETE FROM plans WHERE id = ?'),
-  assignToUser: db.prepare('UPDATE users SET plan_id=? WHERE id=?'),
+  assignToUser: db.prepare('UPDATE users SET plan_id=?, plan_start_date=?, plan_expiry_date=? WHERE id=?'),
 };
 
 function getPlanUsage(userId) {
-  const user = db.prepare('SELECT plan_id FROM users WHERE id=?').get(userId);
+  const user = db.prepare('SELECT plan_id, plan_start_date, plan_expiry_date FROM users WHERE id=?').get(userId);
   const plan = user?.plan_id ? planQueries.findById.get(user.plan_id) : null;
 
-  const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0,0,0,0);
+  // Count calls from plan_start_date (billing period)
+  const periodStart = user?.plan_start_date
+    ? new Date(user.plan_start_date + 'T00:00:00').getTime()
+    : (() => { const d = new Date(); d.setDate(1); d.setHours(0,0,0,0); return d.getTime(); })();
+
   const callsUsed = db.prepare(
     `SELECT COUNT(*) as c FROM calls WHERE user_id=? AND status='ended' AND start_timestamp>=?`
-  ).get(userId, monthStart.getTime())?.c || 0;
+  ).get(userId, periodStart)?.c || 0;
 
   const limit = plan?.call_limit || null;
   const remaining = limit !== null ? Math.max(0, limit - callsUsed) : null;
   const percent = limit ? Math.min(100, Math.round((callsUsed / limit) * 100)) : 0;
-  const month = new Date().toLocaleDateString('en-AU', { month: 'long', year: 'numeric' });
+
+  // Expiry info
+  const expiryDate = user?.plan_expiry_date || null;
+  let daysRemaining = null;
+  let isExpired = false;
+  let expiryFormatted = null;
+  if (expiryDate) {
+    const expiry = new Date(expiryDate + 'T23:59:59');
+    const today = new Date();
+    daysRemaining = Math.ceil((expiry - today) / 86400000);
+    isExpired = daysRemaining < 0;
+    expiryFormatted = expiry.toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' });
+  }
 
   return {
     plan: plan || null,
@@ -421,9 +439,13 @@ function getPlanUsage(userId) {
     calls_limit: limit,
     calls_remaining: remaining,
     percent,
-    month,
-    warning:  limit !== null && percent >= 80 && percent < 100,
-    exceeded: limit !== null && callsUsed >= limit,
+    plan_start_date: user?.plan_start_date || null,
+    plan_expiry_date: expiryDate,
+    expiry_formatted: expiryFormatted,
+    days_remaining: daysRemaining,
+    is_expired: isExpired,
+    warning:  !isExpired && limit !== null && percent >= 80 && percent < 100,
+    exceeded: !isExpired && limit !== null && callsUsed >= limit,
   };
 }
 

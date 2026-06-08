@@ -140,11 +140,17 @@
         <input type="password" id="edit-client-password" class="form-control" placeholder="New password...">
       </div>
       <hr style="border-color:var(--border);margin:16px 0">
-      <div class="form-group">
-        <label class="form-label">📦 Plan</label>
-        <select id="edit-client-plan" class="form-control">
-          <option value="">— No Plan —</option>
-        </select>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">📦 Plan</label>
+          <select id="edit-client-plan" class="form-control">
+            <option value="">— No Plan —</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">📅 Expiry Date <span style="color:var(--text-muted);font-weight:400">(default: 30 days)</span></label>
+          <input type="date" id="edit-client-expiry" class="form-control">
+        </div>
       </div>
       <hr style="border-color:var(--border);margin:16px 0">
       <div class="form-group">
@@ -193,21 +199,35 @@ function populatePlanDropdown() {
   });
 }
 
-function planBadgeHtml(planId, usageMap) {
-  const plan = allPlans.find(p => p.id === planId);
+function planBadgeHtml(client, usageMap) {
+  const plan = allPlans.find(p => p.id === client.plan_id);
   if (!plan) return '<span style="color:var(--text-muted);font-size:12px">No plan</span>';
-  const u = usageMap[planId] || {};
+  const u = usageMap[client.id] || {};
   const pct = u.percent || 0;
-  const color = pct >= 100 ? '#ef4444' : pct >= 80 ? '#f59e0b' : 'var(--accent)';
+
+  // Expiry info
+  let daysLeft = null, expiredFlag = false, expiryColor = 'var(--text-muted)';
+  if (client.plan_expiry_date) {
+    const diff = Math.ceil((new Date(client.plan_expiry_date + 'T23:59:59') - new Date()) / 86400000);
+    daysLeft = diff;
+    expiredFlag = diff < 0;
+    if (expiredFlag) expiryColor = '#ef4444';
+    else if (diff <= 7) expiryColor = '#f59e0b';
+  }
+
+  const barColor = expiredFlag ? '#ef4444' : pct >= 100 ? '#ef4444' : pct >= 80 ? '#f59e0b' : 'var(--accent)';
+  const expiryText = expiredFlag ? '⛔ Expired' : daysLeft !== null ? `⏳ ${daysLeft}d left` : '';
+
   return `
-    <div style="min-width:130px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-        <span style="font-size:12px;font-weight:600;color:${color}">${plan.name}</span>
+    <div style="min-width:150px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+        <span style="font-size:12px;font-weight:600;color:${barColor}">${plan.name}</span>
         <span style="font-size:11px;color:var(--text-muted)">${u.calls_used||0}/${plan.call_limit}</span>
       </div>
-      <div style="height:5px;background:var(--surface2);border-radius:3px;overflow:hidden">
-        <div style="height:100%;width:${Math.min(pct,100)}%;background:${color};border-radius:3px"></div>
+      <div style="height:5px;background:var(--surface2);border-radius:3px;overflow:hidden;margin-bottom:3px">
+        <div style="height:100%;width:${Math.min(pct,100)}%;background:${barColor};border-radius:3px"></div>
       </div>
+      ${expiryText ? `<span style="font-size:10px;color:${expiryColor}">${expiryText}${client.plan_expiry_date ? ' · ' + client.plan_expiry_date : ''}</span>` : ''}
     </div>`;
 }
 
@@ -246,7 +266,7 @@ async function loadClients() {
           <td><div style="font-weight:500">${escHtml(c.name)}</div></td>
           <td style="color:var(--text-muted)">${escHtml(c.email)}</td>
           <td>${escHtml(c.company_name || '—')}</td>
-          <td>${planBadgeHtml(c.plan_id, usageMap)}</td>
+          <td>${planBadgeHtml(c, usageMap)}</td>
           <td>${cost.total_calls || 0}</td>
           <td>${cost.total_cost ? '$' + parseFloat(cost.total_cost).toFixed(2) : '$0.00'}</td>
           <td style="color:var(--text-muted)">${fmtDateShort(c.created_at)}</td>
@@ -272,6 +292,7 @@ function editClient(id, data) {
   document.getElementById('edit-client-password').value = '';
   document.getElementById('edit-client-twilio-token').value = '';
   document.getElementById('edit-client-plan').value = data.plan_id || '';
+  document.getElementById('edit-client-expiry').value = data.plan_expiry_date || '';
   openModal('edit-client-modal');
 }
 
@@ -324,7 +345,7 @@ function bindEvents() {
           twilio_auth_token: document.getElementById('edit-client-twilio-token').value,
           password: document.getElementById('edit-client-password').value || undefined,
         }),
-        apiPut(`/plans/assign/${id}`, { plan_id: planId || null }),
+        apiPut(`/plans/assign/${id}`, { plan_id: planId || null, expiry_date: document.getElementById('edit-client-expiry').value || undefined }),
       ]);
       closeModal('edit-client-modal');
       toast('Client updated', 'success');

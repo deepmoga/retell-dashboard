@@ -64,11 +64,25 @@ router.delete('/:id', (req, res) => {
 // PUT /api/plans/assign/:userId — assign plan to client
 router.put('/assign/:userId', (req, res) => {
   try {
-    const { plan_id } = req.body;
+    const { plan_id, expiry_date } = req.body;
     const user = userQueries.findById.get(req.params.userId);
     if (!user) return res.status(404).json({ error: 'User not found' });
-    planQueries.assignToUser.run(plan_id || null, req.params.userId);
-    res.json({ success: true });
+
+    let startDate = null;
+    let expiryDate = null;
+    if (plan_id) {
+      startDate = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD today
+      if (expiry_date) {
+        expiryDate = expiry_date; // admin-set custom date
+      } else {
+        // Default: 30 days from today
+        const exp = new Date(); exp.setDate(exp.getDate() + 30);
+        expiryDate = exp.toLocaleDateString('en-CA');
+      }
+    }
+
+    planQueries.assignToUser.run(plan_id || null, startDate, expiryDate, req.params.userId);
+    res.json({ success: true, start_date: startDate, expiry_date: expiryDate });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
