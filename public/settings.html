@@ -124,6 +124,51 @@
         </div>
       </div>
 
+      <!-- Timezone Card -->
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header"><div class="card-title">🌍 Timezone</div></div>
+        <div class="card-body">
+          <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px">
+            AI appointment booking mein sahi date/time ke liye apna timezone set karo. Iske basis par AI ko "aaj ki date" batai jaati hai.
+          </p>
+          <div class="form-group">
+            <label class="form-label">Select Timezone</label>
+            <select id="timezone-select" class="form-control">
+              <optgroup label="🇮🇳 India">
+                <option value="Asia/Kolkata">India Standard Time — IST (UTC+5:30)</option>
+              </optgroup>
+              <optgroup label="🇦🇺 Australia">
+                <option value="Australia/Sydney">Sydney / Melbourne — AEST (UTC+10/11)</option>
+                <option value="Australia/Brisbane">Brisbane — AEST (UTC+10)</option>
+                <option value="Australia/Perth">Perth — AWST (UTC+8)</option>
+                <option value="Australia/Adelaide">Adelaide — ACST (UTC+9:30/10:30)</option>
+              </optgroup>
+              <optgroup label="🇬🇧 UK / Europe">
+                <option value="Europe/London">London — GMT/BST (UTC+0/1)</option>
+                <option value="Europe/Paris">Paris / Berlin — CET (UTC+1/2)</option>
+                <option value="Europe/Dubai">Dubai — GST (UTC+4)</option>
+              </optgroup>
+              <optgroup label="🇺🇸 USA">
+                <option value="America/New_York">New York — EST/EDT (UTC-5/4)</option>
+                <option value="America/Chicago">Chicago — CST/CDT (UTC-6/5)</option>
+                <option value="America/Los_Angeles">Los Angeles — PST/PDT (UTC-8/7)</option>
+              </optgroup>
+              <optgroup label="🌏 Asia">
+                <option value="Asia/Singapore">Singapore (UTC+8)</option>
+                <option value="Asia/Karachi">Pakistan — PKT (UTC+5)</option>
+                <option value="Asia/Dhaka">Bangladesh — BST (UTC+6)</option>
+                <option value="Asia/Bangkok">Bangkok (UTC+7)</option>
+                <option value="Asia/Tokyo">Tokyo (UTC+9)</option>
+              </optgroup>
+            </select>
+          </div>
+          <div id="tz-current" style="font-size:12px;color:var(--text-muted);margin-top:8px;padding:8px 12px;background:var(--surface2);border-radius:6px;display:none">
+            🕐 Current time in selected timezone: <strong id="tz-now" style="color:var(--accent)"></strong>
+          </div>
+          <button class="btn btn-primary" id="save-tz-btn" style="margin-top:14px">💾 Save Timezone</button>
+        </div>
+      </div>
+
       <!-- Profile Card -->
       <div class="card" style="margin-bottom:20px">
         <div class="card-header"><div class="card-title">👤 Profile</div></div>
@@ -184,6 +229,14 @@ async function loadProfile() {
     document.getElementById('profile-name').value = u.name || '';
     document.getElementById('profile-company').value = u.company_name || '';
 
+    // Set timezone
+    const tzSel = document.getElementById('timezone-select');
+    if (tzSel && u.timezone) {
+      tzSel.value = u.timezone;
+      if (!tzSel.value) tzSel.value = 'Australia/Sydney';
+    }
+    updateTzClock();
+
     if (u.retell_api_key) {
       document.getElementById('retell-api-key').value = u.retell_api_key;
       setStatus('retell-status', '✓ Set', 'var(--accent)');
@@ -211,7 +264,47 @@ function toggleVisible(inputId) {
   if (el) el.type = el.type === 'password' ? 'text' : 'password';
 }
 
+function updateTzClock() {
+  const tzSel = document.getElementById('timezone-select');
+  const nowEl = document.getElementById('tz-now');
+  const banner = document.getElementById('tz-current');
+  if (!tzSel || !nowEl) return;
+  const tz = tzSel.value;
+  if (!tz) return;
+  try {
+    const now = new Date().toLocaleString('en-AU', {
+      timeZone: tz, weekday:'short', day:'numeric', month:'short',
+      year:'numeric', hour:'2-digit', minute:'2-digit', second:'2-digit',
+    });
+    nowEl.textContent = now;
+    if (banner) banner.style.display = 'block';
+  } catch(_) {}
+}
+
+// Live clock update every second
+setInterval(updateTzClock, 1000);
+
 function bindEvents() {
+  // Timezone selector — show live clock on change
+  const tzSel = document.getElementById('timezone-select');
+  if (tzSel) tzSel.addEventListener('change', updateTzClock);
+
+  // Save Timezone
+  document.getElementById('save-tz-btn').addEventListener('click', async () => {
+    const tz = document.getElementById('timezone-select').value;
+    if (!tz) { toast('Please select a timezone', 'warning'); return; }
+    const btn = document.getElementById('save-tz-btn');
+    btn.disabled = true; btn.textContent = 'Saving...';
+    try {
+      await apiPut('/auth/profile', { timezone: tz });
+      toast(`✅ Timezone saved: ${tz}`, 'success');
+    } catch(err) {
+      toast('Failed: ' + err.message, 'error');
+    } finally {
+      btn.disabled = false; btn.textContent = '💾 Save Timezone';
+    }
+  });
+
   // Save API Keys
   document.getElementById('save-keys-btn').addEventListener('click', async () => {
     const retell = document.getElementById('retell-api-key').value.trim();

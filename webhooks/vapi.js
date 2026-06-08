@@ -3,6 +3,13 @@ const { callQueries, userQueries, db } = require('../database/db');
 const { normalizeCallData } = require('../services/vapi');
 const { downloadRecording } = require('../services/sync');
 
+function getUserTimezone(userId) {
+  try {
+    const user = db.prepare('SELECT timezone FROM users WHERE id=?').get(userId);
+    return user?.timezone || 'Australia/Sydney';
+  } catch(_) { return 'Australia/Sydney'; }
+}
+
 // Check if booking already saved for this call
 function bookingExistsForCall(callId) {
   return db.prepare(`SELECT id FROM appointments WHERE notes LIKE ?`).get(`%${callId}%`);
@@ -144,9 +151,11 @@ router.post('/', async (req, res) => {
             && sd.customer_name && sd.customer_phone
             && !bookingExistsForCall(normalized.call_id)) {
 
-          // Validate date is not in past
-          const bookDate = new Date(sd.appointment_date);
-          const today = new Date(); today.setHours(0,0,0,0);
+          // Use user's timezone for "today" comparison
+          const userTz = getUserTimezone(userId);
+          const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: userTz });
+          const bookDate = new Date(sd.appointment_date + 'T00:00:00');
+          const today = new Date(todayStr + 'T00:00:00');
 
           if (bookDate >= today) {
             // Check if slot already taken

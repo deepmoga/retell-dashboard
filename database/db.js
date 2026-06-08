@@ -166,6 +166,7 @@ try {
 // Migrations for existing installs
 try { db.exec(`ALTER TABLE function_logs ADD COLUMN raw_request TEXT`); } catch(e) {}
 try { db.exec(`ALTER TABLE function_logs ADD COLUMN response_sent TEXT`); } catch(e) {}
+try { db.exec(`ALTER TABLE users ADD COLUMN timezone TEXT DEFAULT 'Australia/Sydney'`); } catch(e) {}
 // New table migrations — safe to re-run
 try { db.exec(`CREATE TABLE IF NOT EXISTS appointments (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, call_id TEXT, customer_name TEXT, customer_phone TEXT, customer_email TEXT, appointment_date TEXT NOT NULL, appointment_time TEXT NOT NULL, duration_minutes INTEGER DEFAULT 30, status TEXT DEFAULT 'pending', service_type TEXT, notes TEXT, confirmation_sent INTEGER DEFAULT 0, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`); } catch(e) {}
 try { db.exec(`CREATE TABLE IF NOT EXISTS working_hours (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, day_of_week INTEGER NOT NULL, is_open INTEGER DEFAULT 1, start_time TEXT DEFAULT '09:00', end_time TEXT DEFAULT '17:00', slot_duration INTEGER DEFAULT 30)`); } catch(e) {}
