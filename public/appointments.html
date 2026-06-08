@@ -211,14 +211,210 @@
 </div>
 
 <script src="/js/app.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+<style>
+  .new-appt-popup {
+    position: fixed;
+    top: 20px; right: 20px;
+    background: #1a1a1a;
+    border: 1.5px solid var(--accent);
+    border-radius: 12px;
+    padding: 16px 20px;
+    min-width: 300px;
+    max-width: 380px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,212,170,0.15);
+    z-index: 99999;
+    animation: slideIn 0.3s ease;
+    cursor: pointer;
+  }
+  .new-appt-popup:hover { border-color: #00ffcc; }
+  @keyframes slideIn {
+    from { transform: translateX(120%); opacity: 0; }
+    to   { transform: translateX(0);   opacity: 1; }
+  }
+  @keyframes slideOut {
+    from { transform: translateX(0);   opacity: 1; }
+    to   { transform: translateX(120%); opacity: 0; }
+  }
+  .popup-header {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 10px;
+  }
+  .popup-icon {
+    width: 36px; height: 36px; border-radius: 8px;
+    background: rgba(0,212,170,0.15);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; flex-shrink: 0;
+  }
+  .popup-title { font-weight: 700; font-size: 14px; color: var(--accent); }
+  .popup-sub   { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+  .popup-body  { font-size: 13px; color: var(--text); line-height: 1.6; }
+  .popup-body strong { color: #fff; }
+  .popup-close {
+    position: absolute; top: 10px; right: 12px;
+    font-size: 16px; color: var(--text-muted); cursor: pointer;
+    background: none; border: none; padding: 2px 6px;
+  }
+  .popup-close:hover { color: var(--text); }
+  .popup-conflict { border-color: var(--danger) !important; }
+  .popup-conflict .popup-title { color: var(--danger) !important; }
+
+  .notif-badge {
+    display: inline-block;
+    background: var(--accent);
+    color: #000;
+    border-radius: 50%;
+    font-size: 10px; font-weight: 700;
+    width: 18px; height: 18px;
+    line-height: 18px; text-align: center;
+    margin-left: 6px;
+    animation: pulse 1s ease 3;
+  }
+</style>
 <script>
 const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+let newApptCount = 0;
 
 document.addEventListener('DOMContentLoaded', async () => {
   if (!requireAuth()) return;
   await Promise.all([loadAppointments(), loadSlots(), loadStats()]);
   bindEvents();
+  initSocket();
+  requestNotifPermission();
 });
+
+// ── Socket.io — real-time new appointment ─────────────────────────────────────
+
+function initSocket() {
+  try {
+    const socket = io();
+    socket.on('connect', () => console.log('[Socket] connected'));
+
+    socket.on('new_appointment', (data) => {
+      console.log('[Socket] new_appointment:', data);
+      // Refresh table + stats
+      loadAppointments();
+      loadStats();
+      loadSlots();
+      // Play alert sound
+      playAlertSound(data.conflict);
+      // Show popup
+      showNewApptPopup(data);
+      // Browser notification
+      showBrowserNotif(data);
+      // Update page title badge
+      newApptCount++;
+      document.title = `(${newApptCount}) New Appointment! — Appointments`;
+    });
+  } catch(e) {
+    console.warn('[Socket] init failed:', e.message);
+  }
+}
+
+// ── Alert Sound (Web Audio API — no file needed) ──────────────────────────────
+
+function playAlertSound(isConflict) {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (isConflict) {
+      // Conflict — 3 short warning beeps
+      [0, 0.2, 0.4].forEach(t => {
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.connect(g); g.connect(ctx.destination);
+        o.type = 'square';
+        o.frequency.setValueAtTime(440, ctx.currentTime + t);
+        g.gain.setValueAtTime(0.3, ctx.currentTime + t);
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.15);
+        o.start(ctx.currentTime + t);
+        o.stop(ctx.currentTime + t + 0.15);
+      });
+    } else {
+      // Success — pleasant 2-note chime
+      [[523, 0], [659, 0.18]].forEach(([freq, t]) => {
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.connect(g); g.connect(ctx.destination);
+        o.type = 'sine';
+        o.frequency.setValueAtTime(freq, ctx.currentTime + t);
+        g.gain.setValueAtTime(0.4, ctx.currentTime + t);
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.6);
+        o.start(ctx.currentTime + t);
+        o.stop(ctx.currentTime + t + 0.6);
+      });
+    }
+  } catch(e) { console.warn('[Sound] Failed:', e.message); }
+}
+
+// ── In-page Popup ─────────────────────────────────────────────────────────────
+
+function showNewApptPopup(data) {
+  // Remove existing popup if any
+  const old = document.getElementById('new-appt-popup');
+  if (old) old.remove();
+
+  const isConflict = data.conflict;
+  const div = document.createElement('div');
+  div.id = 'new-appt-popup';
+  div.className = 'new-appt-popup' + (isConflict ? ' popup-conflict' : '');
+
+  const fmtDate = data.date ? new Date(data.date + 'T00:00:00')
+    .toLocaleDateString('en-IN', { weekday:'short', day:'numeric', month:'short', year:'numeric' }) : '—';
+
+  div.innerHTML = `
+    <button class="popup-close" onclick="closePopup()">✕</button>
+    <div class="popup-header">
+      <div class="popup-icon">${isConflict ? '⚠️' : '📅'}</div>
+      <div>
+        <div class="popup-title">${isConflict ? '⚠️ Booking Conflict!' : '✅ New Appointment Booked!'}</div>
+        <div class="popup-sub">Just now via AI voice call</div>
+      </div>
+    </div>
+    <div class="popup-body">
+      <strong>${escHtml(data.customer_name || 'Customer')}</strong><br>
+      📅 ${escHtml(fmtDate)} at <strong>${escHtml(data.time || '—')}</strong><br>
+      ${isConflict ? `<span style="color:var(--danger);font-size:12px">⚠️ Conflict with existing booking — review needed</span>` : ''}
+    </div>
+    <div style="margin-top:10px;font-size:11px;color:var(--text-muted)">Click to dismiss</div>
+  `;
+
+  div.addEventListener('click', closePopup);
+  document.body.appendChild(div);
+
+  // Auto close after 12 seconds
+  setTimeout(closePopup, 12000);
+}
+
+function closePopup() {
+  const p = document.getElementById('new-appt-popup');
+  if (!p) return;
+  p.style.animation = 'slideOut 0.3s ease forwards';
+  setTimeout(() => p.remove(), 300);
+}
+
+// ── Browser Notification ──────────────────────────────────────────────────────
+
+function requestNotifPermission() {
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+}
+
+function showBrowserNotif(data) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  try {
+    const fmtDate = data.date ? new Date(data.date + 'T00:00:00')
+      .toLocaleDateString('en-IN', { weekday:'short', day:'numeric', month:'short' }) : '';
+    const n = new Notification(data.conflict ? '⚠️ Booking Conflict!' : '📅 New Appointment!', {
+      body: `${data.customer_name || 'Customer'} — ${fmtDate} at ${data.time || ''}`,
+      icon: '/favicon.ico',
+      badge: '/favicon.ico',
+      tag: 'new-appointment',
+      requireInteraction: data.conflict, // stay until dismissed if conflict
+    });
+    n.onclick = () => { window.focus(); n.close(); };
+    if (!data.conflict) setTimeout(() => n.close(), 8000);
+  } catch(e) {}
+}
 
 async function loadStats() {
   try {
