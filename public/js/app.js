@@ -165,6 +165,14 @@ function renderSidebarUser() {
   } else {
     document.body.classList.remove('user-admin');
   }
+
+  // Read-only mode
+  if (user.is_readonly) {
+    document.body.classList.add('readonly-mode');
+    // Show readonly badge in sidebar
+    const badge = document.getElementById('readonly-badge');
+    if (badge) badge.style.display = 'inline-flex';
+  }
 }
 
 // === Modal helpers ===

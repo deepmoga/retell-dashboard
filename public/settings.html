@@ -17,7 +17,7 @@
     <nav class="sidebar-nav">
       <div class="nav-section">Main</div>
       <a class="nav-item" href="/dashboard" data-page="dashboard"><span class="nav-icon">📊</span><span class="nav-label">Dashboard</span></a>
-      <a class="nav-item" href="/agents" data-page="agents"><span class="nav-icon">🤖</span><span class="nav-label">Agent Builder</span></a>
+      <a class="nav-item" href="/agents" data-page="agents" data-hide-readonly><span class="nav-icon">🤖</span><span class="nav-label">Agent Builder</span></a>
       <a class="nav-item" href="/calls" data-page="calls"><span class="nav-icon">📞</span><span class="nav-label">Call Logs</span></a>
       <a class="nav-item" href="/live" data-page="live"><span class="nav-icon">🔴</span><span class="nav-label">Live Calls</span></a>
       <a class="nav-item" href="/appointments" data-page="appointments"><span class="nav-icon">📅</span><span class="nav-label">Appointments</span></a>
@@ -34,6 +34,7 @@
         <div class="user-avatar" id="sidebar-user-avatar">A</div>
         <div><div class="user-name" id="sidebar-user-name">Loading...</div><div class="user-role" id="sidebar-user-role"></div></div>
       </div>
+      <div id="readonly-badge" style="display:none;background:rgba(245,158,11,.15);color:#f59e0b;font-size:11px;font-weight:600;padding:4px 10px;border-radius:6px;text-align:center;margin-bottom:8px">👁 Read-Only Mode</div>
       <button id="logout-btn" class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:10px">🚪 Logout</button>
     </div>
   </aside>

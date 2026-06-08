@@ -33,6 +33,9 @@ html, body { height: 100%; font-family: 'Inter', sans-serif; background: var(--b
 [data-admin-only] { display: none !important; }
 body.user-admin [data-admin-only] { display: revert !important; }
 
+/* Read-only mode — hide action elements */
+body.readonly-mode [data-hide-readonly] { display: none !important; }
+
 a { color: var(--accent); text-decoration: none; }
 a:hover { color: var(--accent-hover); }
 

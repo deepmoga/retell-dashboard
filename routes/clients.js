@@ -80,6 +80,16 @@ router.put('/:id', async (req, res) => {
   }
 });
 
+router.put('/:id/readonly', (req, res) => {
+  try {
+    const { is_readonly } = req.body;
+    db.prepare('UPDATE users SET is_readonly=? WHERE id=?').run(is_readonly ? 1 : 0, req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 router.delete('/:id', (req, res) => {
   try {
     const user = userQueries.findById.get(req.params.id);

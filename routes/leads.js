@@ -6,6 +6,7 @@ const { leadQueries, userQueries } = require('../database/db');
 const { createOutboundCall: retellOutboundCall, listAgents: retellListAgents, listPhoneNumbers: retellListNumbers } = require('../services/retell');
 const { createOutboundCall: vapiOutboundCall, listAssistants: vapiListAssistants, listPhoneNumbers: vapiListNumbers } = require('../services/vapi');
 const authMiddleware = require('../middleware/auth');
+const readonlyBlock = require('../middleware/readonlyBlock');
 
 const router = express.Router();
 const upload = multer({ dest: 'uploads/' });
@@ -32,7 +33,7 @@ router.get('/', (req, res) => {
   }
 });
 
-router.post('/', (req, res) => {
+router.post('/', readonlyBlock, (req, res) => {
   try {
     const userId = req.user.role === 'admin' && req.body.user_id
       ? parseInt(req.body.user_id)
@@ -106,7 +107,7 @@ router.post('/upload', upload.single('file'), (req, res) => {
   }
 });
 
-router.put('/:id', (req, res) => {
+router.put('/:id', readonlyBlock, (req, res) => {
   try {
     const userId = req.user.role === 'admin' ? null : req.user.userId;
     const lead = leadQueries.findById.get(req.params.id);
@@ -131,7 +132,7 @@ router.put('/:id', (req, res) => {
   }
 });
 
-router.delete('/:id', (req, res) => {
+router.delete('/:id', readonlyBlock, (req, res) => {
   try {
     const userId = req.user.role === 'admin' ? null : req.user.userId;
     const lead = leadQueries.findById.get(req.params.id);
@@ -144,7 +145,7 @@ router.delete('/:id', (req, res) => {
   }
 });
 
-router.post('/:id/call', async (req, res) => {
+router.post('/:id/call', readonlyBlock, async (req, res) => {
   try {
     const lead = leadQueries.findById.get(req.params.id);
     if (!lead) return res.status(404).json({ error: 'Lead not found' });

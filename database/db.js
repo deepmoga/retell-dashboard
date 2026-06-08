@@ -170,6 +170,7 @@ try { db.exec(`ALTER TABLE users ADD COLUMN timezone TEXT DEFAULT 'Australia/Syd
 try { db.exec(`ALTER TABLE users ADD COLUMN plan_id INTEGER`); } catch(e) {}
 try { db.exec(`ALTER TABLE users ADD COLUMN plan_start_date TEXT`); } catch(e) {}
 try { db.exec(`ALTER TABLE users ADD COLUMN plan_expiry_date TEXT`); } catch(e) {}
+try { db.exec(`ALTER TABLE users ADD COLUMN is_readonly INTEGER DEFAULT 0`); } catch(e) {}
 try { db.exec(`ALTER TABLE users ADD COLUMN google_refresh_token TEXT`); } catch(e) {}
 try { db.exec(`ALTER TABLE users ADD COLUMN google_calendar_id TEXT DEFAULT 'primary'`); } catch(e) {}
 try { db.exec(`ALTER TABLE appointments ADD COLUMN google_event_id TEXT`); } catch(e) {}
@@ -223,7 +224,7 @@ function seedAdmin() {
 const userQueries = {
   findByEmail: db.prepare('SELECT * FROM users WHERE email = ?'),
   findById: db.prepare('SELECT id, name, email, role, company_name, logo_url, retell_api_key, vapi_api_key, twilio_account_sid, twilio_auth_token, created_at FROM users WHERE id = ?'),
-  findAll: db.prepare('SELECT id, name, email, role, company_name, plan_id, plan_start_date, plan_expiry_date, created_at FROM users ORDER BY created_at DESC'),
+  findAll: db.prepare('SELECT id, name, email, role, company_name, plan_id, plan_start_date, plan_expiry_date, is_readonly, created_at FROM users ORDER BY created_at DESC'),
   create: db.prepare(`
     INSERT INTO users (name, email, password, role, company_name, retell_api_key, twilio_account_sid, twilio_auth_token)
     VALUES (@name, @email, @password, @role, @company_name, @retell_api_key, @twilio_account_sid, @twilio_auth_token)

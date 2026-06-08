@@ -2,6 +2,7 @@ const express = require('express');
 const { db } = require('../database/db');
 const { sendConfirmationEmail } = require('../services/email');
 const authMiddleware = require('../middleware/auth');
+const readonlyBlock = require('../middleware/readonlyBlock');
 
 const router = express.Router();
 
@@ -155,7 +156,7 @@ router.get('/', (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-router.post('/', async (req, res) => {
+router.post('/', readonlyBlock, async (req, res) => {
   try {
     const userId = getUserId(req);
     const { customer_name, customer_phone, customer_email, appointment_date, appointment_time, service_type, notes, duration_minutes } = req.body;
@@ -174,7 +175,7 @@ router.post('/', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-router.put('/:id', (req, res) => {
+router.put('/:id', readonlyBlock, (req, res) => {
   try {
     const appt = db.prepare('SELECT * FROM appointments WHERE id=?').get(req.params.id);
     if (!appt) return res.status(404).json({ error: 'Not found' });
@@ -195,7 +196,7 @@ router.put('/:id', (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-router.delete('/:id', (req, res) => {
+router.delete('/:id', readonlyBlock, (req, res) => {
   try {
     const appt = db.prepare('SELECT * FROM appointments WHERE id=?').get(req.params.id);
     if (!appt) return res.status(404).json({ error: 'Not found' });
