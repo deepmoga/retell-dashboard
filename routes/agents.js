@@ -179,18 +179,15 @@ router.post('/', async (req, res) => {
       firstMessageMode: 'assistant-speaks-first',
     };
 
-    const agent = await vapi.createAssistant(apiKey, payload);
-
-    // Step 2: Try to attach toolIds SEPARATELY (isolation avoids conflict errors)
+    // Attach toolIds inside model (VAPI rejects toolIds at top level)
     try {
       const toolIds = await ensureBookingTools(apiKey, req.user.userId);
-      if (toolIds.length > 0) {
-        await vapi.updateAssistant(apiKey, agent.id, { toolIds });
-        console.log(`[Agents] Tools attached to new agent ${agent.id}`);
-      }
+      if (toolIds.length > 0) payload.model.toolIds = toolIds;
     } catch (toolErr) {
-      console.error('[Agents] Tool attach failed (non-fatal):', toolErr.response?.data || toolErr.message);
+      console.error('[Agents] ensureBookingTools failed (non-fatal):', toolErr.message);
     }
+
+    const agent = await vapi.createAssistant(apiKey, payload);
 
     res.json({ agent });
   } catch (err) {
@@ -223,18 +220,23 @@ router.put('/:id', async (req, res) => {
       payload.voice = { provider: voice_provider || '11labs', voiceId: voice_id || 'paula' };
     }
 
-    await vapi.updateAssistant(apiKey, req.params.id, payload);
-
-    // Step 2: Attach toolIds SEPARATELY
+    // Attach toolIds inside model (VAPI rejects toolIds at top level)
     try {
       const toolIds = await ensureBookingTools(apiKey, req.user.userId);
       if (toolIds.length > 0) {
-        await vapi.updateAssistant(apiKey, req.params.id, { toolIds });
-        console.log(`[Agents] Tools re-attached to ${req.params.id}:`, toolIds);
+        if (!payload.model) {
+          const current = await vapi.getAssistant(apiKey, req.params.id);
+          payload.model = { ...(current?.model || {}), toolIds };
+        } else {
+          payload.model.toolIds = toolIds;
+        }
+        console.log(`[Agents] toolIds added to model for ${req.params.id}:`, toolIds);
       }
     } catch (toolErr) {
-      console.error('[Agents] Tool attach failed (non-fatal):', toolErr.response?.data || toolErr.message);
+      console.error('[Agents] ensureBookingTools failed (non-fatal):', toolErr.message);
     }
+
+    await vapi.updateAssistant(apiKey, req.params.id, payload);
 
     res.json({ success: true });
   } catch (err) {
@@ -296,9 +298,10 @@ router.post('/fix-analysis', async (req, res) => {
         // Step 2: update analysisPlan
         await vapi.updateAssistant(apiKey, agent.id, { analysisPlan: plan });
 
-        // Step 3: attach booking tools
+        // Step 3: attach toolIds inside model (VAPI rejects toolIds at top level)
         if (toolIds.length > 0) {
-          await vapi.updateAssistant(apiKey, agent.id, { toolIds });
+          const cur2 = await vapi.getAssistant(apiKey, agent.id);
+          await vapi.updateAssistant(apiKey, agent.id, { model: { ...(cur2?.model || {}), toolIds } });
         }
         updated++;
         console.log(`[Fix] Updated agent: ${agent.name} (${agent.id}) — prompt + plan + tools`);
