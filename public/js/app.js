@@ -159,11 +159,12 @@ function renderSidebarUser() {
   if (roleEl) roleEl.textContent = user.role === 'admin' ? 'Admin' : (user.company_name || 'Client');
   if (avatarEl) avatarEl.textContent = (user.name || user.email || 'U')[0].toUpperCase();
 
-  // Show/hide admin items
-  const adminItems = document.querySelectorAll('[data-admin-only]');
-  adminItems.forEach(el => {
-    el.style.display = user.role === 'admin' ? '' : 'none';
-  });
+  // Show admin-only items via CSS class (no flash — hidden by default in CSS)
+  if (user.role === 'admin') {
+    document.body.classList.add('user-admin');
+  } else {
+    document.body.classList.remove('user-admin');
+  }
 }
 
 // === Modal helpers ===

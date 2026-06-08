@@ -29,6 +29,10 @@
 
 html, body { height: 100%; font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; }
 
+/* Hide admin-only elements by default — shown only when body.user-admin is set by JS */
+[data-admin-only] { display: none !important; }
+body.user-admin [data-admin-only] { display: revert !important; }
+
 a { color: var(--accent); text-decoration: none; }
 a:hover { color: var(--accent-hover); }
 
