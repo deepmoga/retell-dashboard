@@ -229,4 +229,42 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
+// ── Fix Analysis Plan on ALL agents (one click) ───────────────────────────────
+// Pushes updated analysisPlan with today's date to every VAPI assistant
+router.post('/fix-analysis', async (req, res) => {
+  try {
+    const apiKey = getVapiKey(req);
+    if (!apiKey) return res.status(400).json({ error: 'No VAPI API key configured.' });
+
+    const agents = await vapi.listAssistants(apiKey);
+    if (!agents.length) return res.json({ updated: 0, message: 'No agents found' });
+
+    const plan = getAnalysisPlan();
+    let updated = 0;
+    const errors = [];
+
+    for (const agent of agents) {
+      try {
+        await vapi.updateAssistant(apiKey, agent.id, { analysisPlan: plan });
+        updated++;
+        console.log(`[Fix Analysis] Updated agent: ${agent.name} (${agent.id})`);
+      } catch (err) {
+        const msg = err.response?.data?.message || err.message;
+        errors.push(`${agent.name}: ${msg}`);
+        console.error(`[Fix Analysis] Failed for ${agent.name}:`, msg);
+      }
+    }
+
+    res.json({
+      updated,
+      total: agents.length,
+      errors,
+      today_injected: new Date().toISOString().slice(0, 10),
+      message: `✅ Updated ${updated}/${agents.length} agents with today's date (${new Date().toISOString().slice(0, 10)})`,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.response?.data?.message || err.message });
+  }
+});
+
 module.exports = router;

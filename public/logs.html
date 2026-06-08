@@ -471,9 +471,11 @@ async function clearCurrent() {
 
 function fmtTime(ts) {
   if (!ts) return '—';
-  const d = new Date(ts);
-  return d.toLocaleDateString('en-AU', { day:'2-digit', month:'short' })
-    + ' ' + d.toLocaleTimeString('en-AU', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  // SQLite CURRENT_TIMESTAMP stores UTC without 'Z' — add it so JS converts to local time correctly
+  const utcStr = ts.includes('T') ? ts : ts.replace(' ', 'T') + 'Z';
+  const d = new Date(utcStr);
+  return d.toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })
+    + ' ' + d.toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit', second:'2-digit', hour12: true });
 }
 
 function tryFmt(str) {

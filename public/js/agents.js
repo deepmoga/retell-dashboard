@@ -82,6 +82,21 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('new-agent-btn').addEventListener('click', openNewAgentModal);
   document.getElementById('save-agent-btn').addEventListener('click', saveAgent);
+
+  document.getElementById('fix-analysis-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('fix-analysis-btn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Updating...';
+    try {
+      const data = await apiPost('/agents/fix-analysis', {});
+      toast(data.message || `✅ Updated ${data.updated} agents`, 'success', 6000);
+    } catch(err) {
+      toast('Failed: ' + err.message, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '🗓 Fix Date in All Agents';
+    }
+  });
   document.getElementById('confirm-delete-btn').addEventListener('click', confirmDelete);
 
   document.querySelectorAll('.modal-tab').forEach(tab => {
