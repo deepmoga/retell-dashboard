@@ -26,6 +26,7 @@ jobs:
             cd /var/www/retell-dashboard
 
             echo ">>> Pulling latest code..."
+            git checkout -- package-lock.json || true
             git pull origin main
 
             echo ">>> Latest commits:"
