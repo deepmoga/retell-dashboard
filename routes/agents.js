@@ -87,6 +87,13 @@ async function ensureBookingTools(apiKey, userId) {
       return created.id;
     };
 
+    const todayId = await upsertTool(
+      'getTodayDate',
+      'Get today\'s date, current time, and tomorrow\'s date. Call this tool FIRST at the start of every call so you know the correct date. Also call it whenever the customer asks what today\'s date is.',
+      { type: 'object', properties: {} },
+      `${serverBase}/call`
+    );
+
     const checkId = await upsertTool(
       'checkAvailability',
       'Check if a date and time slot is available for booking an appointment. Call this BEFORE confirming any slot.',
@@ -118,8 +125,8 @@ async function ensureBookingTools(apiKey, userId) {
       `${serverBase}/book-appointment`
     );
 
-    console.log(`[Tools] checkAvailability: ${checkId}, bookAppointment: ${bookId}`);
-    return [checkId, bookId];
+    console.log(`[Tools] getTodayDate: ${todayId}, checkAvailability: ${checkId}, bookAppointment: ${bookId}`);
+    return [todayId, checkId, bookId];
   } catch (err) {
     console.error('[ensureBookingTools]', err.response?.data || err.message);
     return [];

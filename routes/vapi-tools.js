@@ -110,6 +110,9 @@ router.post('/:userId/call', (req, res) => {
 
     console.log(`[VAPI Tool] fn=${parsed.fnName} format=${parsed.format} args=`, parsed.args);
 
+    if (parsed.fnName === 'getTodayDate') {
+      return handleGetTodayDate(userId, res, parsed.toolCallId, parsed.callId, rawBody);
+    }
     if (parsed.fnName === 'checkAvailability') {
       return handleCheckAvailability(userId, parsed.args, res, parsed.toolCallId, parsed.callId, rawBody);
     }
@@ -141,6 +144,35 @@ router.post('/:userId/book-appointment', (req, res) => {
   const parsed = parseVapiCall(req.body);
   handleBookAppointment(userId, parsed?.args || req.body, res, parsed?.toolCallId, parsed?.callId, rawBody);
 });
+
+// ── getTodayDate ──────────────────────────────────────────────────────────────
+
+function handleGetTodayDate(userId, res, toolCallId, callId, rawBody) {
+  try {
+    const tz = getUserTimezone(userId);
+
+    const now = new Date();
+    const todayStr  = now.toLocaleDateString('en-CA', { timeZone: tz }); // YYYY-MM-DD
+    const timeStr   = now.toLocaleTimeString('en-IN', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: true });
+    const fullDate  = now.toLocaleDateString('en-IN', { timeZone: tz, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+    // Tomorrow
+    const tom = new Date(now);
+    tom.setDate(tom.getDate() + 1);
+    const tomorrowStr  = tom.toLocaleDateString('en-CA', { timeZone: tz });
+    const tomorrowFull = tom.toLocaleDateString('en-IN', { timeZone: tz, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+    const resp = `Today is ${fullDate} (${todayStr}). Current time is ${timeStr} (${tz}). Tomorrow is ${tomorrowFull} (${tomorrowStr}).`;
+
+    console.log(`[getTodayDate] userId=${userId} tz=${tz} → ${resp}`);
+    saveLog(userId, 'getTodayDate', {}, resp, 'success', callId, rawBody, resp);
+    return sendResult(res, toolCallId, resp);
+  } catch(err) {
+    const resp = `Today's date: ${new Date().toISOString().slice(0,10)}`;
+    saveLog(userId, 'getTodayDate', {}, `CRASH: ${err.message}`, 'error', callId, rawBody, resp);
+    return sendResult(res, toolCallId, resp);
+  }
+}
 
 // ── checkAvailability ─────────────────────────────────────────────────────────
 
