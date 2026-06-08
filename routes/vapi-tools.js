@@ -1,6 +1,7 @@
 // VAPI Tool Webhook Handler — with full debug logging + timezone support
 const express = require('express');
 const { db } = require('../database/db');
+const gcal = require('../services/google-calendar');
 
 const router = express.Router();
 
@@ -323,6 +324,9 @@ function handleBookAppointment(userId, args, res, toolCallId, callId, rawBody) {
     const resp = `Booking confirmed! Reference #${bookingId}. ${customer_name} is booked for ${service_type || 'Consultation'} on ${formatDate(date)} at ${time}. See you then!`;
     saveLog(userId, 'bookAppointment', args, `SUCCESS: Booking #${bookingId}`, 'success', callId, rawBody, resp);
     console.log(`[bookAppointment] ✅ Saved #${bookingId} for user ${userId}`);
+
+    // Google Calendar sync (non-blocking)
+    gcal.createEvent(userId, { id: bookingId, customer_name, customer_phone, appointment_date: date, appointment_time: time, service_type }).catch(() => {});
 
     return sendResult(res, toolCallId, resp);
 

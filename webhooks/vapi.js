@@ -2,6 +2,7 @@ const express = require('express');
 const { callQueries, userQueries, db } = require('../database/db');
 const { normalizeCallData } = require('../services/vapi');
 const { downloadRecording } = require('../services/sync');
+const gcal = require('../services/google-calendar');
 
 const router = express.Router();
 let ioInstance = null;
@@ -97,11 +98,17 @@ function saveBookingFromWebhook(userId, sd, normalizedCallId, rawCallId) {
     sd.appointment_date, sd.appointment_time,
     status, sd.service_type || 'Service', notes);
 
+  const bookingId = db.prepare('SELECT last_insert_rowid() as id').get()?.id;
   console.log(`[VAPI Webhook] ✅ Booking saved: ${sd.customer_name} ${sd.appointment_date} ${sd.appointment_time} (${status})`);
   saveWebhookLog('vapi', 'booking-saved', rawCallId, userId,
     JSON.stringify({ customer: sd.customer_name, date: sd.appointment_date,
       time: sd.appointment_time, status, conflict: !!slotTaken }),
     'saved');
+
+  // Google Calendar sync (non-blocking, only for confirmed)
+  if (!slotTaken) {
+    gcal.createEvent(userId, { id: bookingId, customer_name: sd.customer_name, customer_phone: sd.customer_phone, appointment_date: sd.appointment_date, appointment_time: sd.appointment_time, service_type: sd.service_type }).catch(() => {});
+  }
 
   if (ioInstance) {
     ioInstance.emit('new_appointment', {

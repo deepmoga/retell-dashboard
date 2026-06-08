@@ -169,6 +169,38 @@
         </div>
       </div>
 
+      <!-- Google Calendar Card -->
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header">
+          <div class="card-title">📅 Google Calendar Sync</div>
+          <span style="font-size:12px;color:var(--text-muted)">Booking hone pe auto event create hoga</span>
+        </div>
+        <div class="card-body">
+          <div id="gcal-connected" style="display:none">
+            <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:rgba(0,212,170,.1);border-radius:8px;margin-bottom:14px">
+              <span style="font-size:24px">✅</span>
+              <div>
+                <div style="font-weight:600;color:var(--accent)">Google Calendar Connected</div>
+                <div style="font-size:12px;color:var(--text-muted)">Har nai booking automatically calendar mein add hogi</div>
+              </div>
+            </div>
+            <button class="btn btn-danger btn-sm" id="gcal-disconnect-btn">🔌 Disconnect Google Calendar</button>
+          </div>
+          <div id="gcal-disconnected" style="display:none">
+            <div style="font-size:13px;color:var(--text-muted);margin-bottom:14px;line-height:1.6">
+              Google Calendar connect karo taaki har appointment automatically aapke calendar mein add ho jaaye.
+              Customer ka naam, time, aur service type event mein hoga.
+            </div>
+            <a href="/api/google-auth/connect" class="btn btn-primary" id="gcal-connect-btn">
+              🗓️ Connect Google Calendar
+            </a>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:10px">
+              Pehle Google Cloud Console mein credentials set karein. <a href="https://console.cloud.google.com" target="_blank" style="color:var(--accent)">console.cloud.google.com</a>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Profile Card -->
       <div class="card" style="margin-bottom:20px">
         <div class="card-header"><div class="card-title">👤 Profile</div></div>
@@ -218,8 +250,28 @@
 document.addEventListener('DOMContentLoaded', async () => {
   if (!requireAuth()) return;
   await loadProfile();
+  await loadGCalStatus();
+  checkGCalCallback();
   bindEvents();
 });
+
+async function loadGCalStatus() {
+  try {
+    const data = await apiGet('/google-auth/status');
+    document.getElementById('gcal-connected').style.display    = data.connected ? 'block' : 'none';
+    document.getElementById('gcal-disconnected').style.display = data.connected ? 'none'  : 'block';
+  } catch(_) {
+    document.getElementById('gcal-disconnected').style.display = 'block';
+  }
+}
+
+function checkGCalCallback() {
+  const params = new URLSearchParams(window.location.search);
+  const gcal = params.get('gcal');
+  if (gcal === 'connected') toast('✅ Google Calendar connected!', 'success');
+  else if (gcal === 'error')  toast('❌ Google Calendar error: ' + (params.get('msg') || 'unknown'), 'error');
+  if (gcal) window.history.replaceState({}, '', '/settings');
+}
 
 async function loadProfile() {
   try {
@@ -285,6 +337,16 @@ function updateTzClock() {
 setInterval(updateTzClock, 1000);
 
 function bindEvents() {
+  // Google Calendar disconnect
+  document.getElementById('gcal-disconnect-btn')?.addEventListener('click', async () => {
+    if (!confirm('Google Calendar disconnect karein?')) return;
+    try {
+      await apiDelete('/google-auth/disconnect');
+      toast('Google Calendar disconnected', 'success');
+      await loadGCalStatus();
+    } catch(err) { toast('Error: ' + err.message, 'error'); }
+  });
+
   // Timezone selector — show live clock on change
   const tzSel = document.getElementById('timezone-select');
   if (tzSel) tzSel.addEventListener('change', updateTzClock);
