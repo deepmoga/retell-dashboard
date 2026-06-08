@@ -3,8 +3,68 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Function Logs — VoiceAgent</title>
+  <title>Debug Logs — VoiceAgent</title>
   <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .tab-bar { display:flex; gap:0; border-bottom:1px solid var(--border); margin-bottom:20px; }
+    .tab-btn {
+      padding:10px 20px; font-size:13px; font-weight:500; color:var(--text-muted);
+      cursor:pointer; border-bottom:2px solid transparent; transition:all 0.15s;
+    }
+    .tab-btn:hover { color:var(--text); }
+    .tab-btn.active { color:var(--accent); border-bottom-color:var(--accent); }
+    .tab-panel { display:none; }
+    .tab-panel.active { display:block; }
+
+    .log-row { cursor:pointer; }
+    .log-row:hover td { background:var(--surface2); }
+    .log-detail {
+      background:#111; border-top:1px solid var(--border);
+    }
+    .log-detail td { padding:0 !important; }
+    .detail-inner {
+      padding:14px 18px;
+      display:grid; grid-template-columns:1fr 1fr; gap:14px;
+    }
+    .detail-block { display:flex; flex-direction:column; gap:4px; }
+    .detail-label { font-size:10px; text-transform:uppercase; color:var(--text-muted); letter-spacing:0.05em; }
+    .detail-pre {
+      background:#1a1a1a; border:1px solid #2a2a2a; border-radius:4px;
+      padding:8px 10px; font-size:11px; font-family:monospace; color:#ccc;
+      white-space:pre-wrap; word-break:break-all; max-height:200px; overflow-y:auto;
+    }
+    .detail-pre::-webkit-scrollbar { width:4px; }
+    .detail-pre::-webkit-scrollbar-thumb { background:#444; border-radius:4px; }
+
+    .badge-fn-check  { background:rgba(0,212,170,0.12); color:var(--accent); }
+    .badge-fn-book   { background:rgba(167,139,250,0.15); color:#a78bfa; }
+    .badge-fn-crash  { background:rgba(231,76,60,0.15); color:var(--danger); }
+
+    .status-success   { background:rgba(0,212,170,0.12); color:var(--accent); }
+    .status-available { background:rgba(0,212,170,0.12); color:var(--accent); }
+    .status-error     { background:rgba(231,76,60,0.15); color:var(--danger); }
+    .status-conflict  { background:rgba(231,76,60,0.15); color:var(--danger); }
+    .status-already_booked { background:rgba(243,156,18,0.15); color:var(--warning); }
+    .status-outside_hours  { background:rgba(243,156,18,0.15); color:var(--warning); }
+    .status-closed    { background:rgba(243,156,18,0.15); color:var(--warning); }
+    .status-received  { background:rgba(100,100,100,0.15); color:#aaa; }
+
+    .live-dot {
+      display:inline-block; width:7px; height:7px; border-radius:50%;
+      background:var(--accent); margin-right:5px;
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    .filter-row { display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; align-items:center; }
+    .filter-row select, .filter-row input { font-size:12px; padding:5px 10px; }
+
+    .wh-banner {
+      padding:10px 14px; background:rgba(0,212,170,0.06);
+      border:1px solid rgba(0,212,170,0.2); border-radius:6px;
+      font-size:12px; color:var(--text-muted); margin-bottom:16px;
+    }
+  </style>
 </head>
 <body>
 <div class="app-layout">
@@ -15,14 +75,14 @@
     </div>
     <nav class="sidebar-nav">
       <div class="nav-section">Main</div>
-      <a class="nav-item" href="/dashboard" data-page="dashboard"><span class="nav-icon">📊</span><span class="nav-label">Dashboard</span></a>
-      <a class="nav-item" href="/agents" data-page="agents"><span class="nav-icon">🤖</span><span class="nav-label">Agent Builder</span></a>
-      <a class="nav-item" href="/calls" data-page="calls"><span class="nav-icon">📞</span><span class="nav-label">Call Logs</span></a>
-      <a class="nav-item" href="/live" data-page="live"><span class="nav-icon">🔴</span><span class="nav-label">Live Calls</span></a>
+      <a class="nav-item" href="/dashboard"    data-page="dashboard"><span class="nav-icon">📊</span><span class="nav-label">Dashboard</span></a>
+      <a class="nav-item" href="/agents"       data-page="agents"><span class="nav-icon">🤖</span><span class="nav-label">Agent Builder</span></a>
+      <a class="nav-item" href="/calls"        data-page="calls"><span class="nav-icon">📞</span><span class="nav-label">Call Logs</span></a>
+      <a class="nav-item" href="/live"         data-page="live"><span class="nav-icon">🔴</span><span class="nav-label">Live Calls</span></a>
       <a class="nav-item" href="/appointments" data-page="appointments"><span class="nav-icon">📅</span><span class="nav-label">Appointments</span></a>
-      <a class="nav-item" href="/leads" data-page="leads"><span class="nav-icon">👥</span><span class="nav-label">Leads</span></a>
-      <a class="nav-item" href="/costs" data-page="costs"><span class="nav-icon">💰</span><span class="nav-label">Cost Tracker</span></a>
-      <a class="nav-item" href="/logs" data-page="logs"><span class="nav-icon">🔍</span><span class="nav-label">Function Logs</span></a>
+      <a class="nav-item" href="/leads"        data-page="leads"><span class="nav-icon">👥</span><span class="nav-label">Leads</span></a>
+      <a class="nav-item" href="/costs"        data-page="costs"><span class="nav-icon">💰</span><span class="nav-label">Cost Tracker</span></a>
+      <a class="nav-item active" href="/logs"  data-page="logs"><span class="nav-icon">🔍</span><span class="nav-label">Debug Logs</span></a>
       <div class="nav-section">Account</div>
       <a class="nav-item" href="/settings" data-page="settings"><span class="nav-icon">🔑</span><span class="nav-label">Settings</span></a>
       <div class="nav-section" data-admin-only>Admin</div>
@@ -40,145 +100,382 @@
   <main class="main-content">
     <div class="page-header">
       <div>
-        <div class="page-title">🔍 Function Logs</div>
-        <div class="page-sub">Live debug log — every checkAvailability and bookAppointment call</div>
+        <div class="page-title">🔍 Debug Logs</div>
+        <div class="page-sub"><span class="live-dot"></span>Auto-refreshes every 8s — see exactly what VAPI sends</div>
       </div>
       <div style="display:flex;gap:8px">
-        <button class="btn btn-secondary" onclick="loadLogs()">↻ Refresh</button>
-        <button class="btn btn-danger" onclick="clearLogs()">🗑 Clear Logs</button>
+        <button class="btn btn-secondary btn-sm" onclick="refreshAll()">↻ Refresh Now</button>
+        <button class="btn btn-danger btn-sm" onclick="clearCurrent()">🗑 Clear</button>
       </div>
     </div>
 
     <div class="page-body">
-      <!-- Stats -->
-      <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:20px">
-        <div class="stat-card accent">
-          <div class="stat-label">Total Calls</div>
-          <div class="stat-value" id="stat-total">—</div>
+
+      <!-- Stats row -->
+      <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr));margin-bottom:20px">
+        <div class="stat-card accent"><div class="stat-label">Tool Calls</div><div class="stat-value" id="s-total">—</div></div>
+        <div class="stat-card"><div class="stat-label">Checks ✅</div><div class="stat-value" id="s-checks">—</div></div>
+        <div class="stat-card"><div class="stat-label">Bookings 📋</div><div class="stat-value" id="s-booked" style="color:var(--accent)">—</div></div>
+        <div class="stat-card danger"><div class="stat-label">Errors ❌</div><div class="stat-value" id="s-errors">—</div></div>
+        <div class="stat-card"><div class="stat-label">Webhook Events</div><div class="stat-value" id="s-webhooks">—</div></div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="tab-bar">
+        <div class="tab-btn active" data-tab="fn">🔧 Tool Calls (checkAvailability / bookAppointment)</div>
+        <div class="tab-btn" data-tab="wh">📡 Webhook Events (raw VAPI payloads)</div>
+      </div>
+
+      <!-- Tool Calls Tab -->
+      <div class="tab-panel active" id="tab-fn">
+        <div class="wh-banner">
+          💡 Yahan dekhein kya VAPI bhej raha hai aur kya response ja raha hai. Row click karo full detail ke liye.
         </div>
-        <div class="stat-card">
-          <div class="stat-label">Availability Checks</div>
-          <div class="stat-value" id="stat-checks">—</div>
+        <div class="filter-row">
+          <select id="fn-filter-fn" onchange="loadFnLogs()">
+            <option value="">All Functions</option>
+            <option value="checkAvailability">checkAvailability</option>
+            <option value="bookAppointment">bookAppointment</option>
+            <option value="UNKNOWN">UNKNOWN / Parse Error</option>
+          </select>
+          <select id="fn-filter-status" onchange="loadFnLogs()">
+            <option value="">All Status</option>
+            <option value="success">✅ Success</option>
+            <option value="available">✅ Available</option>
+            <option value="already_booked">⚠️ Already Booked</option>
+            <option value="outside_hours">⚠️ Outside Hours</option>
+            <option value="closed">⚠️ Closed Day</option>
+            <option value="conflict">❌ Conflict</option>
+            <option value="error">❌ Error</option>
+          </select>
+          <span style="font-size:12px;color:var(--text-muted)" id="fn-count"></span>
         </div>
-        <div class="stat-card">
-          <div class="stat-label">Bookings Saved ✅</div>
-          <div class="stat-value" id="stat-booked" style="color:var(--accent)">—</div>
-        </div>
-        <div class="stat-card danger">
-          <div class="stat-label">Errors ❌</div>
-          <div class="stat-value" id="stat-errors">—</div>
+        <div class="card">
+          <div class="table-wrapper">
+            <table id="fn-table">
+              <thead>
+                <tr>
+                  <th style="width:130px">Time</th>
+                  <th>Function</th>
+                  <th>Date / Time</th>
+                  <th>Customer</th>
+                  <th>Status</th>
+                  <th>Result (short)</th>
+                  <th style="width:20px"></th>
+                </tr>
+              </thead>
+              <tbody id="fn-tbody">
+                <tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted)">Loading...</td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
-      <!-- Logs Table -->
-      <div class="card">
-        <div class="card-header">
-          <div class="card-title">Recent Function Calls</div>
-          <div style="font-size:12px;color:var(--text-muted)">Auto-refreshes every 10s during active calls</div>
+      <!-- Webhook Events Tab -->
+      <div class="tab-panel" id="tab-wh">
+        <div class="wh-banner">
+          📡 Har VAPI webhook event yahan save hota hai — call-started, end-of-call-report, function-call sab. Row click karo pura body dekhne ke liye.
         </div>
-        <div class="table-wrapper">
-          <table>
-            <thead>
-              <tr>
-                <th>Time</th>
-                <th>Function</th>
-                <th>Date / Time</th>
-                <th>Customer</th>
-                <th>Status</th>
-                <th>Result</th>
-              </tr>
-            </thead>
-            <tbody id="logs-tbody">
-              <tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text-muted)">Loading...</td></tr>
-            </tbody>
-          </table>
+        <div class="filter-row">
+          <select id="wh-filter-type" onchange="loadWhLogs()">
+            <option value="">All Event Types</option>
+            <option value="call-started">call-started</option>
+            <option value="end-of-call-report">end-of-call-report</option>
+            <option value="call-ended">call-ended</option>
+            <option value="function-call">function-call</option>
+            <option value="tool-calls">tool-calls</option>
+            <option value="status-update">status-update</option>
+            <option value="error">error</option>
+          </select>
+          <span style="font-size:12px;color:var(--text-muted)" id="wh-count"></span>
+        </div>
+        <div class="card">
+          <div class="table-wrapper">
+            <table id="wh-table">
+              <thead>
+                <tr>
+                  <th style="width:130px">Time</th>
+                  <th>Source</th>
+                  <th>Event Type</th>
+                  <th>Call ID</th>
+                  <th>Status</th>
+                  <th>Error</th>
+                  <th style="width:20px"></th>
+                </tr>
+              </thead>
+              <tbody id="wh-tbody">
+                <tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted)">Loading...</td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
-    </div>
+
+    </div><!-- page-body -->
   </main>
 </div>
 
 <script src="/js/app.js"></script>
 <script>
-let autoRefresh;
+let autoRefreshTimer;
+let expandedFn = new Set();
+let expandedWh = new Set();
 
 document.addEventListener('DOMContentLoaded', async () => {
   if (!requireAuth()) return;
-  await loadLogs();
-  autoRefresh = setInterval(loadLogs, 10000);
+
+  // Tab switching
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    });
+  });
+
+  await refreshAll();
+  autoRefreshTimer = setInterval(refreshAll, 8000);
 });
 
-async function loadLogs() {
+async function refreshAll() {
+  await Promise.all([loadFnLogs(), loadWhLogs()]);
+}
+
+// ── Function Logs ─────────────────────────────────────────────────────────────
+
+async function loadFnLogs() {
   try {
-    const data = await apiGet('/logs?limit=100');
-    renderLogs(data.logs || []);
+    const fn     = document.getElementById('fn-filter-fn').value;
+    const status = document.getElementById('fn-filter-status').value;
+    const params = new URLSearchParams({ limit: 150 });
+    if (fn)     params.set('fn', fn);
+    if (status) params.set('status', status);
+
+    const data = await apiGet('/logs?' + params);
+    renderFnLogs(data.logs || []);
   } catch(err) {
-    console.error(err);
+    document.getElementById('fn-tbody').innerHTML =
+      `<tr><td colspan="7" style="color:var(--danger);text-align:center;padding:20px">${escHtml(err.message)}</td></tr>`;
   }
 }
 
-function renderLogs(logs) {
-  const tbody = document.getElementById('logs-tbody');
+function renderFnLogs(logs) {
+  // Update stats
+  const allData = logs; // use visible set for counts
+  document.getElementById('s-total').textContent   = logs.length;
+  document.getElementById('s-checks').textContent  = logs.filter(l => l.function_name === 'checkAvailability').length;
+  document.getElementById('s-booked').textContent  = logs.filter(l => l.status === 'success' && l.function_name === 'bookAppointment').length;
+  document.getElementById('s-errors').textContent  = logs.filter(l => l.status === 'error').length;
+  document.getElementById('fn-count').textContent  = `${logs.length} entries`;
 
-  const total = logs.length;
-  const checks = logs.filter(l => l.function_name === 'checkAvailability').length;
-  const booked = logs.filter(l => l.status === 'success' && l.function_name === 'bookAppointment').length;
-  const errors = logs.filter(l => l.status === 'error').length;
-
-  document.getElementById('stat-total').textContent = total;
-  document.getElementById('stat-checks').textContent = checks;
-  document.getElementById('stat-booked').textContent = booked;
-  document.getElementById('stat-errors').textContent = errors;
-
+  const tbody = document.getElementById('fn-tbody');
   if (!logs.length) {
-    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text-muted)">
-      No logs yet — make a test call to see function calls here
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted)">
+      No tool call logs yet — VAPI ne abhi koi function call nahi ki
     </td></tr>`;
     return;
   }
 
-  tbody.innerHTML = logs.map(log => {
+  const rows = [];
+  logs.forEach(log => {
     let args = {};
     try { args = JSON.parse(log.args_json || '{}'); } catch(_) {}
 
-    const statusBadge = {
-      success:      '<span class="badge" style="background:rgba(0,212,170,0.15);color:var(--accent)">✅ Success</span>',
-      available:    '<span class="badge" style="background:rgba(0,212,170,0.15);color:var(--accent)">✅ Available</span>',
-      already_booked: '<span class="badge" style="background:rgba(243,156,18,0.15);color:var(--warning)">⚠️ Already Booked</span>',
-      conflict:     '<span class="badge" style="background:rgba(231,76,60,0.15);color:var(--danger)">❌ Conflict</span>',
-      error:        '<span class="badge" style="background:rgba(231,76,60,0.15);color:var(--danger)">❌ Error</span>',
-    }[log.status] || `<span class="badge">${log.status}</span>`;
+    const fnBadge = {
+      checkAvailability: '<span class="badge badge-fn-check">🔍 checkAvailability</span>',
+      bookAppointment:   '<span class="badge badge-fn-book">📋 bookAppointment</span>',
+    }[log.function_name] || `<span class="badge badge-fn-crash">⚠️ ${escHtml(log.function_name||'?')}</span>`;
 
-    const fnBadge = log.function_name === 'bookAppointment'
-      ? '<span style="color:#a78bfa;font-weight:600">📋 bookAppointment</span>'
-      : '<span style="color:var(--accent)">🔍 checkAvailability</span>';
+    const stClass = 'status-' + (log.status || 'received');
+    const stLabel = {
+      success:       '✅ Saved',
+      available:     '✅ Available',
+      already_booked:'⚠️ Taken',
+      outside_hours: '⚠️ Off-hours',
+      closed:        '⚠️ Closed',
+      conflict:      '❌ Conflict',
+      error:         '❌ Error',
+    }[log.status] || log.status;
 
-    const dateTime = args.date && args.time
-      ? `<div style="font-weight:600">${args.date}</div><div style="color:var(--text-muted);font-size:11px">${args.time}</div>`
+    const dtHtml = args.date
+      ? `<div style="font-weight:600;font-size:12px">${escHtml(args.date)}</div><div style="color:var(--text-muted);font-size:11px">${escHtml(args.time||'—')}</div>`
       : '<span style="color:var(--text-dim)">—</span>';
 
-    const customer = args.customer_name
-      ? `<div style="font-weight:600">${escHtml(args.customer_name)}</div><div style="color:var(--text-muted);font-size:11px">${escHtml(args.customer_phone||'')}</div>`
+    const custHtml = args.customer_name
+      ? `<div style="font-weight:600;font-size:12px">${escHtml(args.customer_name)}</div><div style="color:var(--text-muted);font-size:11px">${escHtml(args.customer_phone||'')}</div>`
       : '<span style="color:var(--text-dim)">—</span>';
 
-    const shortResult = (log.result || '').slice(0, 80) + ((log.result || '').length > 80 ? '...' : '');
+    const shortResult = (log.result || '').slice(0, 60) + ((log.result||'').length > 60 ? '…' : '');
+    const expanded = expandedFn.has(log.id);
 
-    return `<tr>
-      <td style="font-size:11px;color:var(--text-muted);white-space:nowrap">${new Date(log.created_at).toLocaleString()}</td>
-      <td>${fnBadge}</td>
-      <td>${dateTime}</td>
-      <td>${customer}</td>
-      <td>${statusBadge}</td>
-      <td style="font-size:11px;color:var(--text-muted);max-width:200px">${escHtml(shortResult)}</td>
-    </tr>`;
-  }).join('');
+    rows.push(`
+      <tr class="log-row" onclick="toggleFn(${log.id})">
+        <td style="font-size:11px;color:var(--text-muted);white-space:nowrap">${fmtTime(log.created_at)}</td>
+        <td>${fnBadge}</td>
+        <td>${dtHtml}</td>
+        <td>${custHtml}</td>
+        <td><span class="badge ${stClass}">${stLabel}</span></td>
+        <td style="font-size:11px;color:var(--text-muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(shortResult)}</td>
+        <td style="color:var(--text-muted);font-size:11px">${expanded ? '▲' : '▼'}</td>
+      </tr>`);
+
+    if (expanded) {
+      const rawReq  = tryFmt(log.raw_request);
+      const argsFmt = tryFmt(log.args_json);
+      const respFmt = log.response_sent || '—';
+      rows.push(`
+        <tr class="log-detail" id="fn-detail-${log.id}">
+          <td colspan="7">
+            <div class="detail-inner">
+              <div class="detail-block" style="grid-column:1/-1">
+                <div class="detail-label">📨 Raw Request from VAPI (exact body received)</div>
+                <div class="detail-pre">${escHtml(rawReq)}</div>
+              </div>
+              <div class="detail-block">
+                <div class="detail-label">🔍 Parsed Args</div>
+                <div class="detail-pre">${escHtml(argsFmt)}</div>
+              </div>
+              <div class="detail-block">
+                <div class="detail-label">📤 Response Sent to VAPI</div>
+                <div class="detail-pre">${escHtml(respFmt)}</div>
+              </div>
+              <div class="detail-block">
+                <div class="detail-label">ℹ️ Full Result</div>
+                <div class="detail-pre">${escHtml(log.result || '—')}</div>
+              </div>
+              <div class="detail-block">
+                <div class="detail-label">📞 Call ID</div>
+                <div class="detail-pre">${escHtml(log.call_id || '—')}</div>
+              </div>
+            </div>
+          </td>
+        </tr>`);
+    }
+  });
+
+  tbody.innerHTML = rows.join('');
 }
 
-async function clearLogs() {
-  if (!confirm('Clear all logs?')) return;
-  await apiDelete('/logs/clear');
-  await loadLogs();
-  toast('Logs cleared', 'success');
+function toggleFn(id) {
+  if (expandedFn.has(id)) expandedFn.delete(id);
+  else expandedFn.add(id);
+  loadFnLogs();
+}
+
+// ── Webhook Logs ──────────────────────────────────────────────────────────────
+
+async function loadWhLogs() {
+  try {
+    const type = document.getElementById('wh-filter-type').value;
+    const params = new URLSearchParams({ limit: 100 });
+    if (type) params.set('type', type);
+
+    const data = await apiGet('/logs/webhooks?' + params);
+    renderWhLogs(data.logs || []);
+  } catch(err) {
+    document.getElementById('wh-tbody').innerHTML =
+      `<tr><td colspan="7" style="color:var(--danger);text-align:center;padding:20px">${escHtml(err.message)}</td></tr>`;
+  }
+}
+
+function renderWhLogs(logs) {
+  document.getElementById('s-webhooks').textContent = logs.length;
+  document.getElementById('wh-count').textContent = `${logs.length} events`;
+
+  const tbody = document.getElementById('wh-tbody');
+  if (!logs.length) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted)">
+      No webhook events yet — VAPI ne abhi webhook nahi bheja
+    </td></tr>`;
+    return;
+  }
+
+  const rows = [];
+  logs.forEach(log => {
+    const expanded = expandedWh.has(log.id);
+    const stClass = log.status === 'error' ? 'status-error' : 'status-received';
+    const typeBadge = log.event_type === 'end-of-call-report'
+      ? `<span class="badge" style="background:rgba(167,139,250,0.15);color:#a78bfa">${escHtml(log.event_type)}</span>`
+      : log.event_type === 'error'
+      ? `<span class="badge status-error">${escHtml(log.event_type)}</span>`
+      : `<span class="badge ${stClass}">${escHtml(log.event_type || '?')}</span>`;
+
+    rows.push(`
+      <tr class="log-row" onclick="toggleWh(${log.id})">
+        <td style="font-size:11px;color:var(--text-muted);white-space:nowrap">${fmtTime(log.created_at)}</td>
+        <td><span class="badge" style="background:rgba(0,212,170,0.08);color:var(--accent)">${escHtml(log.source||'?')}</span></td>
+        <td>${typeBadge}</td>
+        <td style="font-size:11px;font-family:monospace;color:var(--text-muted)">${escHtml((log.call_id||'—').slice(0,20))}</td>
+        <td><span class="badge ${stClass}">${escHtml(log.status||'?')}</span></td>
+        <td style="font-size:11px;color:var(--danger)">${escHtml((log.error_message||'').slice(0,60))}</td>
+        <td style="color:var(--text-muted);font-size:11px">${expanded ? '▲' : '▼'}</td>
+      </tr>`);
+
+    if (expanded) {
+      const rawFmt = tryFmt(log.raw_body);
+      rows.push(`
+        <tr class="log-detail" id="wh-detail-${log.id}">
+          <td colspan="7">
+            <div class="detail-inner" style="grid-template-columns:1fr">
+              <div class="detail-block">
+                <div class="detail-label">📨 Full Raw Body from VAPI</div>
+                <div class="detail-pre" style="max-height:350px">${escHtml(rawFmt)}</div>
+              </div>
+              ${log.error_message ? `
+              <div class="detail-block">
+                <div class="detail-label">❌ Error Message</div>
+                <div class="detail-pre" style="color:var(--danger)">${escHtml(log.error_message)}</div>
+              </div>` : ''}
+            </div>
+          </td>
+        </tr>`);
+    }
+  });
+
+  tbody.innerHTML = rows.join('');
+}
+
+function toggleWh(id) {
+  if (expandedWh.has(id)) expandedWh.delete(id);
+  else expandedWh.add(id);
+  loadWhLogs();
+}
+
+// ── Clear ─────────────────────────────────────────────────────────────────────
+
+async function clearCurrent() {
+  const activeTab = document.querySelector('.tab-btn.active')?.dataset.tab;
+  if (!confirm(`Clear ${activeTab === 'wh' ? 'webhook' : 'function call'} logs?`)) return;
+  try {
+    if (activeTab === 'wh') {
+      await apiDelete('/logs/webhooks/clear');
+    } else {
+      await apiDelete('/logs/clear');
+    }
+    await refreshAll();
+    toast('Logs cleared', 'success');
+  } catch(err) { toast('Failed: ' + err.message, 'error'); }
+}
+
+// ── Utils ─────────────────────────────────────────────────────────────────────
+
+function fmtTime(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts);
+  return d.toLocaleDateString('en-AU', { day:'2-digit', month:'short' })
+    + ' ' + d.toLocaleTimeString('en-AU', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+}
+
+function tryFmt(str) {
+  if (!str || str === 'null' || str === '') return '—';
+  try {
+    const parsed = JSON.parse(str);
+    return JSON.stringify(parsed, null, 2);
+  } catch(_) {
+    return str;
+  }
 }
 </script>
 </body>

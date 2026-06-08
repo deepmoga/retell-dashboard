@@ -82,8 +82,18 @@ function findUserForCall(callData) {
   return vapiUser?.id || 1;
 }
 
+function saveWebhookLog(source, eventType, callId, userId, rawBody, status = 'received', errorMsg = '') {
+  try {
+    db.prepare(`
+      INSERT INTO webhook_logs (source, event_type, call_id, user_id, raw_body, status, error_message)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(source, eventType, callId || '', userId || null, String(rawBody).slice(0, 8000), status, errorMsg || '');
+  } catch(e) { console.error('[WebhookLog] Failed:', e.message); }
+}
+
 router.post('/', async (req, res) => {
   res.status(200).json({ received: true });
+  const rawBody = JSON.stringify(req.body);
 
   try {
     const event = req.body;
@@ -94,6 +104,9 @@ router.post('/', async (req, res) => {
     console.log(`[VAPI Webhook] Event: ${type}, call: ${callData?.id}`);
 
     const userId = findUserForCall(callData);
+
+    // Log every webhook event
+    saveWebhookLog('vapi', type || 'unknown', callData?.id, userId, rawBody, 'received');
 
     if (type === 'call-started' || type === 'status-update' && callData.status === 'in-progress') {
       const normalized = normalizeCallData({ ...callData, status: 'in-progress' }, userId);
@@ -188,6 +201,7 @@ router.post('/', async (req, res) => {
     }
   } catch (err) {
     console.error('[VAPI Webhook] Error:', err.message);
+    saveWebhookLog('vapi', 'error', '', null, rawBody, 'error', err.message);
   }
 });
 
