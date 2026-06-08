@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Analytics — VoiceAgent</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<div class="app-layout">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">V</div>
+      <div><div class="logo-text">VoiceAgent</div><div class="logo-sub">Dashboard</div></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Main</div>
+      <a class="nav-item" href="/dashboard" data-page="dashboard"><span class="nav-icon">📊</span><span class="nav-label">Dashboard</span></a>
+      <a class="nav-item" href="/agents" data-page="agents"><span class="nav-icon">🤖</span><span class="nav-label">Agent Builder</span></a>
+      <a class="nav-item" href="/calls" data-page="calls"><span class="nav-icon">📞</span><span class="nav-label">Call Logs</span></a>
+      <a class="nav-item" href="/live" data-page="live"><span class="nav-icon">🔴</span><span class="nav-label">Live Calls</span></a>
+      <a class="nav-item" href="/appointments" data-page="appointments"><span class="nav-icon">📅</span><span class="nav-label">Appointments</span></a>
+      <a class="nav-item active" href="/analytics" data-page="analytics"><span class="nav-icon">📈</span><span class="nav-label">Analytics</span></a>
+      <a class="nav-item" href="/leads" data-page="leads"><span class="nav-icon">👥</span><span class="nav-label">Leads</span></a>
+      <a class="nav-item" href="/costs" data-page="costs" data-admin-only><span class="nav-icon">💰</span><span class="nav-label">Cost Tracker</span></a>
+      <div class="nav-section" data-admin-only>Admin</div>
+      <a class="nav-item" href="/clients" data-page="clients" data-admin-only><span class="nav-icon">⚙️</span><span class="nav-label">Clients</span></a>
+      <div class="nav-section">Account</div>
+      <a class="nav-item" href="/settings" data-page="settings"><span class="nav-icon">🔑</span><span class="nav-label">Settings</span></a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar" id="sidebar-user-avatar">A</div>
+        <div><div class="user-name" id="sidebar-user-name">Loading...</div><div class="user-role" id="sidebar-user-role"></div></div>
+      </div>
+      <button id="logout-btn" class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:10px">🚪 Logout</button>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Conversion Analytics</div>
+        <div class="page-sub">Calls → Bookings — performance this month</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <select id="days-filter" class="form-control" style="width:140px">
+          <option value="7">Last 7 days</option>
+          <option value="30" selected>Last 30 days</option>
+          <option value="90">Last 90 days</option>
+        </select>
+        <button class="btn btn-secondary btn-sm" onclick="loadAll()">↺ Refresh</button>
+      </div>
+    </div>
+
+    <div class="page-body">
+
+      <!-- Overview Cards -->
+      <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:24px">
+
+        <div class="stat-card">
+          <div class="stat-label">Total Calls</div>
+          <div class="stat-value" id="ov-calls">—</div>
+          <div class="stat-sub" id="ov-calls-sub" style="color:var(--text-muted)"></div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-label">Bookings</div>
+          <div class="stat-value" id="ov-bookings">—</div>
+          <div class="stat-sub" id="ov-bookings-sub" style="color:var(--text-muted)"></div>
+        </div>
+
+        <div class="stat-card accent">
+          <div class="stat-label">Conversion Rate</div>
+          <div class="stat-value" id="ov-rate">—</div>
+          <div class="stat-sub" id="ov-rate-sub"></div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-label">Avg Call Duration</div>
+          <div class="stat-value" id="ov-duration">—</div>
+          <div class="stat-sub">per call</div>
+        </div>
+
+      </div>
+
+      <!-- Trend Chart -->
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header">
+          <div class="card-title">📈 Calls vs Bookings — Daily Trend</div>
+        </div>
+        <div class="card-body"><canvas id="chart-trend" height="120"></canvas></div>
+      </div>
+
+      <!-- Agent + Day/Hour Row -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
+
+        <!-- By Hour -->
+        <div class="card">
+          <div class="card-header"><div class="card-title">🕐 Best Calling Hours</div></div>
+          <div class="card-body"><canvas id="chart-hour" height="180"></canvas></div>
+        </div>
+
+        <!-- By Day -->
+        <div class="card">
+          <div class="card-header"><div class="card-title">📅 Best Days of Week</div></div>
+          <div class="card-body"><canvas id="chart-day" height="180"></canvas></div>
+        </div>
+
+      </div>
+
+      <!-- Agent Table -->
+      <div class="card">
+        <div class="card-header"><div class="card-title">🤖 Agent Performance</div></div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Agent</th>
+                <th>Total Calls</th>
+                <th>Answered (>30s)</th>
+                <th>Avg Duration</th>
+                <th>Answer Rate</th>
+              </tr>
+            </thead>
+            <tbody id="agent-tbody">
+              <tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text-muted)">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script src="/js/app.js"></script>
+<script>
+let chartTrend, chartHour, chartDay;
+
+const chartDefaults = {
+  responsive: true,
+  plugins: { legend: { labels: { color: '#888', font: { size: 11 } } } },
+  scales: {
+    x: { ticks: { color: '#666', font: { size: 10 } }, grid: { color: '#1e1e1e' } },
+    y: { ticks: { color: '#666', font: { size: 10 } }, grid: { color: '#1e1e1e' }, beginAtZero: true },
+  },
+};
+
+document.addEventListener('DOMContentLoaded', async () => {
+  if (!requireAuth()) return;
+  await loadAll();
+  document.getElementById('days-filter').addEventListener('change', loadAll);
+});
+
+async function loadAll() {
+  const days = document.getElementById('days-filter').value;
+  await Promise.all([loadOverview(), loadTrend(days), loadByHour(), loadByDay(), loadByAgent()]);
+}
+
+async function loadOverview() {
+  try {
+    const d = await apiGet('/analytics/overview');
+
+    document.getElementById('ov-calls').textContent    = d.totalCalls;
+    document.getElementById('ov-bookings').textContent = d.totalBookings;
+    document.getElementById('ov-rate').textContent     = d.convRate + '%';
+    document.getElementById('ov-duration').textContent = fmtDuration(d.avgDuration);
+
+    // vs last month
+    const callDiff = d.totalCalls - d.prevCalls;
+    const rateDiff = (parseFloat(d.convRate) - parseFloat(d.prevRate)).toFixed(1);
+
+    document.getElementById('ov-calls-sub').textContent    = (callDiff >= 0 ? '▲' : '▼') + ' ' + Math.abs(callDiff) + ' vs last month';
+    document.getElementById('ov-calls-sub').style.color    = callDiff >= 0 ? 'var(--accent)' : '#ef4444';
+    document.getElementById('ov-bookings-sub').textContent = 'Last month: ' + d.prevBookings;
+    document.getElementById('ov-bookings-sub').style.color = 'var(--text-muted)';
+    document.getElementById('ov-rate-sub').textContent     = (rateDiff >= 0 ? '▲' : '▼') + ' ' + Math.abs(rateDiff) + '% vs last month';
+    document.getElementById('ov-rate-sub').style.color     = rateDiff >= 0 ? '#4ade80' : '#f87171';
+  } catch(e) {}
+}
+
+async function loadTrend(days) {
+  try {
+    const { trend } = await apiGet('/analytics/trend?days=' + days);
+    const labels   = trend.map(d => d.date.slice(5));
+    const calls    = trend.map(d => d.calls);
+    const bookings = trend.map(d => d.bookings);
+
+    if (chartTrend) chartTrend.destroy();
+    chartTrend = new Chart(document.getElementById('chart-trend'), {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Calls', data: calls, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,.08)', tension: 0.4, fill: true, pointRadius: 2 },
+          { label: 'Bookings', data: bookings, borderColor: '#00d4aa', backgroundColor: 'rgba(0,212,170,.08)', tension: 0.4, fill: true, pointRadius: 2 },
+        ],
+      },
+      options: { ...chartDefaults, interaction: { mode: 'index', intersect: false } },
+    });
+  } catch(e) {}
+}
+
+async function loadByHour() {
+  try {
+    const { byHour } = await apiGet('/analytics/by-hour');
+    const labels = byHour.map(h => h.hour + ':00');
+    const calls  = byHour.map(h => h.calls);
+    const max    = Math.max(...calls);
+
+    if (chartHour) chartHour.destroy();
+    chartHour = new Chart(document.getElementById('chart-hour'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Calls',
+          data: calls,
+          backgroundColor: calls.map(c => c === max && max > 0 ? '#00d4aa' : 'rgba(59,130,246,.5)'),
+          borderRadius: 3,
+        }],
+      },
+      options: { ...chartDefaults, plugins: { legend: { display: false } } },
+    });
+  } catch(e) {}
+}
+
+async function loadByDay() {
+  try {
+    const { byDay } = await apiGet('/analytics/by-day');
+    const labels = byDay.map(d => d.day.slice(0,3));
+    const calls  = byDay.map(d => d.calls);
+    const max    = Math.max(...calls);
+
+    if (chartDay) chartDay.destroy();
+    chartDay = new Chart(document.getElementById('chart-day'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Calls',
+          data: calls,
+          backgroundColor: calls.map(c => c === max && max > 0 ? '#00d4aa' : 'rgba(139,92,246,.5)'),
+          borderRadius: 4,
+        }],
+      },
+      options: { ...chartDefaults, plugins: { legend: { display: false } } },
+    });
+  } catch(e) {}
+}
+
+async function loadByAgent() {
+  try {
+    const { agents } = await apiGet('/analytics/by-agent');
+    const tbody = document.getElementById('agent-tbody');
+
+    if (!agents.length) {
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text-muted)">No data yet</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = agents.map(a => {
+      const answerRate = a.total_calls > 0 ? Math.round((a.answered / a.total_calls) * 100) : 0;
+      const barColor   = answerRate >= 70 ? '#00d4aa' : answerRate >= 40 ? '#f59e0b' : '#ef4444';
+      return `
+        <tr>
+          <td><div style="font-weight:500">${escHtml(a.agent_name || '—')}</div></td>
+          <td>${a.total_calls}</td>
+          <td>${a.answered}</td>
+          <td>${fmtDuration(Math.round(a.avg_duration || 0))}</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:8px">
+              <div style="flex:1;height:6px;background:var(--surface2);border-radius:3px;overflow:hidden">
+                <div style="height:100%;width:${answerRate}%;background:${barColor};border-radius:3px"></div>
+              </div>
+              <span style="font-size:12px;font-weight:600;color:${barColor};min-width:36px">${answerRate}%</span>
+            </div>
+          </td>
+        </tr>`;
+    }).join('');
+  } catch(e) {}
+}
+</script>
+</body>
+</html>

@@ -22,6 +22,7 @@ const vapiToolRoutes = require('./routes/vapi-tools');
 const logsRoutes = require('./routes/logs');
 const plansRoutes = require('./routes/plans');
 const googleAuthRoutes = require('./routes/google-auth');
+const analyticsRoutes = require('./routes/analytics');
 
 // --- Init ---
 initDatabase();
@@ -70,6 +71,7 @@ app.use('/api/vapi-tools', vapiToolRoutes);
 app.use('/api/logs', logsRoutes);
 app.use('/api/plans', plansRoutes);
 app.use('/api/google-auth', googleAuthRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 // Dashboard stats endpoint
 const authMiddleware = require('./middleware/auth');
@@ -91,7 +93,7 @@ app.use('/webhook/retell', webhookRouter);
 app.use('/webhook/vapi', vapiWebhookRouter);
 
 // --- SPA fallback for HTML pages ---
-const pages = ['dashboard', 'calls', 'live', 'leads', 'costs', 'clients', 'settings', 'appointments', 'agents', 'logs'];
+const pages = ['dashboard', 'calls', 'live', 'leads', 'costs', 'clients', 'settings', 'appointments', 'agents', 'logs', 'analytics'];
 pages.forEach(page => {
   app.get(`/${page}`, (req, res) => {
     res.sendFile(path.join(__dirname, 'public', `${page}.html`));
