@@ -18,27 +18,39 @@ function getModelProvider(modelChoice) {
     ? 'groq' : 'openai';
 }
 
-const ANALYSIS_PLAN = {
-  structuredDataPrompt: `Extract booking details from this call transcript. Return a JSON object with:
-- booking_confirmed: true only if customer clearly agreed to book and gave their details
+// Dynamic — current date injected every time agent is saved
+// so VAPI's analysis LLM always knows the correct year
+function getAnalysisPlan() {
+  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const year  = new Date().getFullYear();
+  return {
+    structuredDataPrompt: `TODAY'S DATE IS ${today}. CURRENT YEAR IS ${year}.
+
+Extract booking details from this call transcript. Return a JSON object with:
+- booking_confirmed: true ONLY if the customer clearly agreed to book AND confirmed the date/time at the END of the call. If the customer said "No" or changed their mind, set to false.
 - customer_name: full name given by customer (null if not given)
 - customer_phone: phone number given by customer (null if not given)
-- appointment_date: date in YYYY-MM-DD format (null if not given)
-- appointment_time: time in HH:MM 24-hour format (null if not given)
+- appointment_date: date in YYYY-MM-DD format. IMPORTANT: Always use year ${year} or ${year+1} — NEVER use past years like 2023 or 2024. If customer says "twelfth of June" that means ${year}-06-12. Convert all relative/verbal dates using today=${today}.
+- appointment_time: time in HH:MM 24-hour format (e.g. "11 AM" = "11:00", "2 PM" = "14:00")
 - service_type: service requested (null if not mentioned)
-If any required field is missing or booking was not confirmed, set booking_confirmed to false.`,
-  structuredDataSchema: {
-    type: 'object',
-    properties: {
-      booking_confirmed:  { type: 'boolean' },
-      customer_name:      { type: 'string' },
-      customer_phone:     { type: 'string' },
-      appointment_date:   { type: 'string' },
-      appointment_time:   { type: 'string' },
-      service_type:       { type: 'string' },
+
+CRITICAL RULES:
+- appointment_date MUST be ${year} or later — never a past year
+- booking_confirmed must be false if customer said "No", "not now", or didn't confirm
+- If date is unclear, set appointment_date to null and booking_confirmed to false`,
+    structuredDataSchema: {
+      type: 'object',
+      properties: {
+        booking_confirmed:  { type: 'boolean' },
+        customer_name:      { type: 'string' },
+        customer_phone:     { type: 'string' },
+        appointment_date:   { type: 'string' },
+        appointment_time:   { type: 'string' },
+        service_type:       { type: 'string' },
+      },
     },
-  },
-};
+  };
+}
 
 // Create/ensure VAPI tools exist, return their IDs
 async function ensureBookingTools(apiKey, userId) {
@@ -134,7 +146,7 @@ router.post('/', async (req, res) => {
         systemPrompt: system_prompt || '',
         temperature: 0.7,
       },
-      analysisPlan: ANALYSIS_PLAN,
+      analysisPlan: getAnalysisPlan(),
       voice: { provider: voice_provider || '11labs', voiceId: voice_id || 'paula' },
       firstMessage: first_message || '',
       language: language || 'en-US',
@@ -170,7 +182,7 @@ router.put('/:id', async (req, res) => {
     const modelChoice = req.body.model_id || 'gpt-4o-mini';
 
     // Step 1: Update agent settings WITHOUT toolIds
-    const payload = { analysisPlan: ANALYSIS_PLAN, responseDelaySeconds: 0 };
+    const payload = { analysisPlan: getAnalysisPlan(), responseDelaySeconds: 0 };
     if (agent_name !== undefined) payload.name = agent_name;
     if (first_message !== undefined) payload.firstMessage = first_message;
     if (language !== undefined) payload.language = language;
