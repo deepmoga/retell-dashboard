@@ -283,11 +283,12 @@ router.post('/fix-analysis', async (req, res) => {
         // Step 1: Get current system prompt, prepend today's date
         try {
           const current = await vapi.getAssistant(apiKey, agent.id);
-          const existing = current?.model?.systemPrompt || '';
+          const currentModel = current?.model || {};
+          const existing = currentModel?.systemPrompt || '';
           const cleaned  = existing.replace(/^CURRENT DATE:.*?\n{1,3}/s, '').trimStart();
           const newPrompt = `CURRENT DATE: Today is ${fullDate} (${today}). Current year is ${year}. Current time: ${timeNow} (${userTz}). Tomorrow is ${tomorrow}. NEVER say a future date has passed — always verify against today=${today}.\n\n${cleaned}`;
-          // Only send systemPrompt in model update (VAPI PATCH — partial update)
-          await vapi.updateAssistant(apiKey, agent.id, { model: { systemPrompt: newPrompt } });
+          // Preserve full model config — VAPI PATCH does shallow merge on 'model' object
+          await vapi.updateAssistant(apiKey, agent.id, { model: { ...currentModel, systemPrompt: newPrompt } });
         } catch(e) {
           console.error(`[Fix] systemPrompt update failed for ${agent.name}:`, e.response?.data || e.message);
         }
