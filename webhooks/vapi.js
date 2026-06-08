@@ -2,7 +2,6 @@ const express = require('express');
 const { callQueries, userQueries, db } = require('../database/db');
 const { normalizeCallData } = require('../services/vapi');
 const { downloadRecording } = require('../services/sync');
-const { syncAppointment } = require('../services/gcal-sync');
 
 // Check if booking already saved for this call
 function bookingExistsForCall(callId) {
@@ -159,9 +158,6 @@ router.post('/', async (req, res) => {
               console.log(`[VAPI Webhook] ⚠️ CONFLICT: ${sd.customer_name} vs ${slotTaken.customer_name} on ${sd.appointment_date} ${sd.appointment_time}`);
             } else {
               console.log(`[VAPI Webhook] ✅ Booking saved: ${sd.customer_name} on ${sd.appointment_date} at ${sd.appointment_time}`);
-              // Sync to Google Calendar
-              const newAppt = db.prepare('SELECT id FROM appointments WHERE user_id=? AND appointment_date=? AND appointment_time=? ORDER BY id DESC LIMIT 1').get(userId, sd.appointment_date, sd.appointment_time);
-              if (newAppt) syncAppointment(newAppt.id, 'create').catch(() => {});
             }
 
             // Emit socket event for real-time dashboard notification

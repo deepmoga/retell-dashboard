@@ -102,35 +102,6 @@
         </div>
       </div>
 
-      <!-- Google Calendar Sync -->
-      <div class="card" style="margin-top:20px">
-        <div class="card-header">
-          <div class="card-title">📅 Sync with Google Calendar</div>
-        </div>
-        <div class="card-body">
-          <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px">
-            Yeh link Google Calendar, Apple Calendar, ya Outlook mein add karo — sare appointments automatically sync ho jayenge.
-          </p>
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <input type="text" id="ical-link" class="form-control" style="flex:1;font-size:12px;font-family:monospace" readonly placeholder="Loading...">
-            <button class="btn btn-primary" onclick="copyIcalLink()">📋 Copy Link</button>
-          </div>
-          <div style="margin-top:16px;display:flex;gap:12px;flex-wrap:wrap">
-            <a id="gcal-add-link" href="#" target="_blank" class="btn btn-secondary btn-sm" style="display:flex;align-items:center;gap:6px">
-              <img src="https://www.gstatic.com/calendar/images/dynamiclogo_2020q4/calendar_31_2x.png" style="width:16px;height:16px"> Add to Google Calendar
-            </a>
-            <button class="btn btn-secondary btn-sm" onclick="downloadIcal()">⬇️ Download .ics file</button>
-          </div>
-          <div style="margin-top:16px;padding:12px;background:var(--surface2);border-radius:6px;font-size:12px;color:var(--text-muted)">
-            <strong style="color:var(--text)">Google Calendar mein add karne ka tarika:</strong><br>
-            1. Google Calendar kholo → Settings (⚙️) → <strong>Other calendars</strong><br>
-            2. <strong>"From URL"</strong> click karo<br>
-            3. Upar wala link paste karo → <strong>Add Calendar</strong><br>
-            ✅ Sare appointments dikhne lagenge — har ghante auto-refresh hoga
-          </div>
-        </div>
-      </div>
-
       <!-- Available Slots Preview -->
       <div class="card" style="margin-top:20px">
         <div class="card-header">
@@ -246,43 +217,8 @@ const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Satur
 document.addEventListener('DOMContentLoaded', async () => {
   if (!requireAuth()) return;
   await Promise.all([loadAppointments(), loadSlots(), loadStats()]);
-  setupIcalLink();
   bindEvents();
 });
-
-function setupIcalLink() {
-  const user = getUser();
-  if (!user) return;
-  const token = getToken();
-  const base = window.location.origin;
-  const link = `${base}/api/ical/${user.id}?token=${token}`;
-
-  const input = document.getElementById('ical-link');
-  if (input) input.value = link;
-
-  const gcalLink = document.getElementById('gcal-add-link');
-  if (gcalLink) {
-    gcalLink.href = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(link)}`;
-  }
-}
-
-function copyIcalLink() {
-  const input = document.getElementById('ical-link');
-  if (!input) return;
-  navigator.clipboard.writeText(input.value).then(() => {
-    toast('Link copied! ✅ Paste it in Google Calendar → Settings → Other Calendars → From URL', 'success', 5000);
-  }).catch(() => {
-    input.select();
-    document.execCommand('copy');
-    toast('Link copied!', 'success');
-  });
-}
-
-function downloadIcal() {
-  const input = document.getElementById('ical-link');
-  if (!input) return;
-  window.open(input.value, '_blank');
-}
 
 async function loadStats() {
   try {
