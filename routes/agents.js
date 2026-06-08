@@ -26,18 +26,35 @@ function getAnalysisPlan() {
   return {
     structuredDataPrompt: `TODAY'S DATE IS ${today}. CURRENT YEAR IS ${year}.
 
-Extract booking details from this call transcript. Return a JSON object with:
-- booking_confirmed: true ONLY if the customer clearly agreed to book AND confirmed the date/time at the END of the call. If the customer said "No" or changed their mind, set to false.
-- customer_name: full name given by customer (null if not given)
-- customer_phone: phone number given by customer (null if not given)
-- appointment_date: date in YYYY-MM-DD format. IMPORTANT: Always use year ${year} or ${year+1} — NEVER use past years like 2023 or 2024. If customer says "twelfth of June" that means ${year}-06-12. Convert all relative/verbal dates using today=${today}.
-- appointment_time: time in HH:MM 24-hour format (e.g. "11 AM" = "11:00", "2 PM" = "14:00")
+Extract booking details from this call transcript. Return a JSON object with these fields:
+
+- booking_confirmed: boolean. Set true ONLY if at the END of the call the customer said YES/confirmed AND gave their name and phone. If customer said "No", "not yet", or call ended without confirmation — set false.
+
+- customer_name: full name given by customer (null if not provided)
+
+- customer_phone: phone number given by customer (null if not provided)
+
+- appointment_date: YYYY-MM-DD format.
+  RULES FOR DATE:
+  * Current year is ${year}. NEVER use years before ${year}.
+  * "this Friday" or "coming Friday" = nearest upcoming Friday from ${today}
+  * "next Monday" = Monday of next week from ${today}
+  * "12th of June" or "June 12" = ${year}-06-12
+  * "tomorrow" = ${new Date(new Date(today).getTime() + 86400000).toISOString().slice(0,10)}
+  * If customer said a day name (Monday, Friday etc), calculate the actual date using today=${today}
+  * If date is ambiguous or not confirmed, set null
+
+- appointment_time: HH:MM in 24-hour format.
+  RULES FOR TIME:
+  * "10 in the morning" or "10 AM" = "10:00"
+  * "2 in the afternoon" or "2 PM" = "14:00"
+  * "half past 3" or "3:30 PM" = "15:30"
+  * "11 o'clock" = "11:00"
+  * If time not given, set null
+
 - service_type: service requested (null if not mentioned)
 
-CRITICAL RULES:
-- appointment_date MUST be ${year} or later — never a past year
-- booking_confirmed must be false if customer said "No", "not now", or didn't confirm
-- If date is unclear, set appointment_date to null and booking_confirmed to false`,
+CRITICAL: If booking_confirmed is false, all other fields can be null. Only set booking_confirmed=true if you clearly see the customer said yes AND provided name and phone number.`,
     structuredDataSchema: {
       type: 'object',
       properties: {
