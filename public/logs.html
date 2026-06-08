@@ -180,13 +180,21 @@
         <div class="filter-row">
           <select id="wh-filter-type" onchange="loadWhLogs()">
             <option value="">All Event Types</option>
-            <option value="call-started">call-started</option>
-            <option value="end-of-call-report">end-of-call-report</option>
-            <option value="call-ended">call-ended</option>
-            <option value="function-call">function-call</option>
-            <option value="tool-calls">tool-calls</option>
-            <option value="status-update">status-update</option>
-            <option value="error">error</option>
+            <optgroup label="📋 Booking Debug">
+              <option value="structured-data-check">structured-data-check (booking data)</option>
+              <option value="booking-saved">✅ booking-saved</option>
+              <option value="booking-skip">⚠️ booking-skip (why not saved)</option>
+              <option value="booking-error">❌ booking-error</option>
+            </optgroup>
+            <optgroup label="📡 VAPI Events">
+              <option value="call-started">call-started</option>
+              <option value="end-of-call-report">end-of-call-report</option>
+              <option value="call-ended">call-ended</option>
+              <option value="function-call">function-call</option>
+              <option value="tool-calls">tool-calls</option>
+              <option value="status-update">status-update</option>
+              <option value="error">error</option>
+            </optgroup>
           </select>
           <span style="font-size:12px;color:var(--text-muted)" id="wh-count"></span>
         </div>

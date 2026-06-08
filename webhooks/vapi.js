@@ -143,46 +143,83 @@ router.post('/', async (req, res) => {
 
       // PRIMARY: Save booking from VAPI's analysisPlan structured data
       try {
-        const analysis = reportData.analysis || msg.analysis || {};
+        // VAPI puts analysis in multiple places depending on version — check all
+        const analysis = msg.analysis || reportData.analysis || event.analysis || {};
         const sd = analysis.structuredData || {};
-        console.log('[VAPI Webhook] Structured data:', JSON.stringify(sd));
 
-        if (sd.booking_confirmed && sd.appointment_date && sd.appointment_time
-            && sd.customer_name && sd.customer_phone
-            && !bookingExistsForCall(normalized.call_id)) {
+        // Log structuredData always so we can debug
+        const sdLog = {
+          booking_confirmed: sd.booking_confirmed,
+          customer_name:     sd.customer_name,
+          customer_phone:    sd.customer_phone,
+          appointment_date:  sd.appointment_date,
+          appointment_time:  sd.appointment_time,
+          service_type:      sd.service_type,
+        };
+        console.log('[VAPI Webhook] structuredData:', JSON.stringify(sdLog));
+        saveWebhookLog('vapi', 'structured-data-check', callData?.id, userId,
+          JSON.stringify({ structuredData: sdLog, call_id: normalized.call_id }),
+          'received');
 
-          // Use user's timezone for "today" comparison
+        // booking_confirmed can be boolean true OR string "true" depending on LLM
+        const isConfirmed = sd.booking_confirmed === true || sd.booking_confirmed === 'true';
+        const hasRequiredFields = sd.appointment_date && sd.appointment_time && sd.customer_name;
+        const alreadySaved = bookingExistsForCall(normalized.call_id);
+
+        if (!isConfirmed) {
+          console.log('[VAPI Webhook] booking_confirmed is not true:', sd.booking_confirmed, '— skipping');
+          saveWebhookLog('vapi', 'booking-skip', callData?.id, userId,
+            JSON.stringify({ reason: 'booking_confirmed not true', value: sd.booking_confirmed }),
+            'skipped');
+        } else if (!hasRequiredFields) {
+          console.log('[VAPI Webhook] Missing required fields:', JSON.stringify(sdLog));
+          saveWebhookLog('vapi', 'booking-skip', callData?.id, userId,
+            JSON.stringify({ reason: 'missing fields', sdLog }),
+            'skipped');
+        } else if (alreadySaved) {
+          console.log('[VAPI Webhook] Booking already saved for call:', normalized.call_id);
+        } else {
+          // Timezone-aware past date check
           const userTz = getUserTimezone(userId);
           const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: userTz });
           const bookDate = new Date(sd.appointment_date + 'T00:00:00');
-          const today = new Date(todayStr + 'T00:00:00');
+          const today    = new Date(todayStr + 'T00:00:00');
 
-          if (bookDate >= today) {
-            // Check if slot already taken
+          if (bookDate < today) {
+            console.log(`[VAPI Webhook] ⚠️ Past date rejected: ${sd.appointment_date} (today=${todayStr} tz=${userTz})`);
+            saveWebhookLog('vapi', 'booking-skip', callData?.id, userId,
+              JSON.stringify({ reason: 'past date', appointment_date: sd.appointment_date, today: todayStr, tz: userTz }),
+              'skipped');
+          } else {
+            // Check slot conflict
             const slotTaken = db.prepare(`
               SELECT id, customer_name FROM appointments
-              WHERE user_id = ? AND appointment_date = ? AND appointment_time = ?
-              AND status = 'confirmed'
+              WHERE user_id=? AND appointment_date=? AND appointment_time=? AND status='confirmed'
             `).get(userId, sd.appointment_date, sd.appointment_time);
 
             const status = slotTaken ? 'pending' : 'confirmed';
-            const notes = slotTaken
-              ? `⚠️ CONFLICT — slot already booked by ${slotTaken.customer_name}. Booked via AI call — ${normalized.call_id}`
+            const notes  = slotTaken
+              ? `⚠️ CONFLICT — slot booked by ${slotTaken.customer_name}. via AI call — ${normalized.call_id}`
               : `Booked via AI call — ${normalized.call_id}`;
 
             db.prepare(`
               INSERT INTO appointments (user_id, customer_name, customer_phone, appointment_date, appointment_time, status, service_type, notes)
               VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            `).run(userId, sd.customer_name, sd.customer_phone, sd.appointment_date, sd.appointment_time,
-              status, sd.service_type || 'Service', notes);
+            `).run(userId,
+              sd.customer_name,
+              sd.customer_phone || '',
+              sd.appointment_date,
+              sd.appointment_time,
+              status,
+              sd.service_type || 'Service',
+              notes
+            );
 
-            if (slotTaken) {
-              console.log(`[VAPI Webhook] ⚠️ CONFLICT: ${sd.customer_name} vs ${slotTaken.customer_name} on ${sd.appointment_date} ${sd.appointment_time}`);
-            } else {
-              console.log(`[VAPI Webhook] ✅ Booking saved: ${sd.customer_name} on ${sd.appointment_date} at ${sd.appointment_time}`);
-            }
+            console.log(`[VAPI Webhook] ✅ Booking saved: ${sd.customer_name} on ${sd.appointment_date} at ${sd.appointment_time} (status=${status})`);
+            saveWebhookLog('vapi', 'booking-saved', callData?.id, userId,
+              JSON.stringify({ customer: sd.customer_name, date: sd.appointment_date, time: sd.appointment_time, status }),
+              'saved');
 
-            // Emit socket event for real-time dashboard notification
             if (ioInstance) {
               ioInstance.emit('new_appointment', {
                 customer_name: sd.customer_name,
@@ -190,17 +227,15 @@ router.post('/', async (req, res) => {
                 time: sd.appointment_time,
                 status,
                 conflict: !!slotTaken,
-                conflictWith: slotTaken?.customer_name || null,
               });
             }
-          } else {
-            console.log('[VAPI Webhook] ⚠️ Skipped past date booking:', sd.appointment_date);
           }
-        } else {
-          console.log('[VAPI Webhook] No confirmed booking in this call. booking_confirmed:', sd.booking_confirmed);
         }
       } catch (e) {
-        console.error('[VAPI Webhook] Analysis booking error:', e.message);
+        console.error('[VAPI Webhook] Analysis booking error:', e.message, e.stack);
+        saveWebhookLog('vapi', 'booking-error', callData?.id, userId,
+          JSON.stringify({ error: e.message }),
+          'error', e.message);
       }
 
       if (ioInstance) {
