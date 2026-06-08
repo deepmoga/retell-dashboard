@@ -17,8 +17,11 @@ function getUserTimezone(userId) {
 }
 
 function bookingExistsForCall(callId) {
-  return db.prepare(`SELECT id FROM appointments WHERE notes LIKE ? OR call_id=?`)
-    .get(`%${callId}%`, callId);
+  // Check both raw ID and vapi_ prefixed ID — tool saves raw, webhook normalizes with prefix
+  const rawId      = callId.replace(/^vapi_/, '');
+  const prefixedId = callId.startsWith('vapi_') ? callId : `vapi_${callId}`;
+  return db.prepare(`SELECT id FROM appointments WHERE call_id=? OR call_id=?`)
+    .get(rawId, prefixedId);
 }
 
 function saveWebhookLog(source, eventType, callId, userId, rawBody, status = 'received', errorMsg = '') {

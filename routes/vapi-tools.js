@@ -291,6 +291,16 @@ function handleBookAppointment(userId, args, res, toolCallId, callId, rawBody) {
       return sendResult(res, toolCallId, resp);
     }
 
+    // Prevent double booking: if this call already saved a booking, return same confirmation
+    if (callId) {
+      const callBooking = db.prepare(`SELECT id, customer_name FROM appointments WHERE call_id=?`).get(callId);
+      if (callBooking) {
+        const resp = `Booking already confirmed! Reference #${callBooking.id} for ${callBooking.customer_name}.`;
+        saveLog(userId, 'bookAppointment', args, `DUPLICATE_CALL: already booked #${callBooking.id}`, 'duplicate', callId, rawBody, resp);
+        return sendResult(res, toolCallId, resp);
+      }
+    }
+
     // Check slot conflict
     const existing = db.prepare(`
       SELECT id FROM appointments
