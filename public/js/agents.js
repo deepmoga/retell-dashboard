@@ -108,7 +108,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     btn.textContent = '⏳ Updating...';
     try {
       const data = await apiPost('/agents/fix-analysis', {});
-      toast(data.message || `✅ Updated ${data.updated} agents`, 'success', 6000);
+      if (data.updated === 0) {
+        const errMsg = data.errors?.join(' | ') || 'Unknown error';
+        toast(`❌ 0 agents updated. Error: ${errMsg}`, 'error', 8000);
+      } else {
+        toast(data.message || `✅ Updated ${data.updated} agents`, 'success', 6000);
+        if (data.errors?.length) toast(`⚠️ Some failed: ${data.errors.join(', ')}`, 'warning', 6000);
+      }
     } catch(err) {
       toast('Failed: ' + err.message, 'error');
     } finally {
