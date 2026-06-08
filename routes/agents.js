@@ -264,22 +264,45 @@ router.post('/fix-analysis', async (req, res) => {
     if (!agents.length) return res.json({ updated: 0, message: 'No agents found' });
 
     const plan = getAnalysisPlan();
-    // Get booking tool IDs (create if not exist)
     const toolIds = await ensureBookingTools(apiKey, req.user.userId);
+
+    // Date info for system prompt injection
+    const userTz   = (() => { try { const u = require('../database/db').db.prepare('SELECT timezone FROM users WHERE id=?').get(req.user.userId); return u?.timezone || 'Australia/Sydney'; } catch(_) { return 'Australia/Sydney'; } })();
+    const today    = new Date().toLocaleDateString('en-CA', { timeZone: userTz });
+    const year     = new Date(today).getFullYear();
+    const fullDate = new Date().toLocaleDateString('en-IN', { timeZone: userTz, weekday:'long', day:'numeric', month:'long', year:'numeric' });
+    const timeNow  = new Date().toLocaleTimeString('en-IN', { timeZone: userTz, hour:'2-digit', minute:'2-digit', hour12: true });
+    const tomDate  = new Date(today); tomDate.setDate(tomDate.getDate() + 1);
+    const tomorrow = tomDate.toLocaleDateString('en-IN', { timeZone: userTz, weekday:'long', day:'numeric', month:'long', year:'numeric' });
 
     let updated = 0;
     const errors = [];
 
     for (const agent of agents) {
       try {
-        // Step 1: update analysisPlan
-        await vapi.updateAssistant(apiKey, agent.id, { analysisPlan: plan });
-        // Step 2: attach booking tools
+        // Step 1: Get current system prompt to prepend date
+        let systemPrompt = null;
+        try {
+          const current = await vapi.getAssistant(apiKey, agent.id);
+          const existing = current?.model?.systemPrompt || '';
+          // Remove old date header if present, then prepend fresh one
+          const cleaned = existing.replace(/^CURRENT DATE:.*?\n{1,3}/s, '').trimStart();
+          systemPrompt = `CURRENT DATE: Today is ${fullDate} (${today}). Current year is ${year}. Current time: ${timeNow} (${userTz}). Tomorrow is ${tomorrow}. NEVER say a future date has passed — always verify against today=${today}.\n\n${cleaned}`;
+        } catch(_) {}
+
+        // Step 2: update analysisPlan + system prompt in one call
+        const updatePayload = { analysisPlan: plan };
+        if (systemPrompt && agent.model) {
+          updatePayload.model = { ...agent.model, systemPrompt };
+        }
+        await vapi.updateAssistant(apiKey, agent.id, updatePayload);
+
+        // Step 3: attach booking tools
         if (toolIds.length > 0) {
           await vapi.updateAssistant(apiKey, agent.id, { toolIds });
         }
         updated++;
-        console.log(`[Fix] Updated agent: ${agent.name} (${agent.id}) — plan + tools`);
+        console.log(`[Fix] Updated agent: ${agent.name} (${agent.id}) — prompt + plan + tools`);
       } catch (err) {
         const msg = err.response?.data?.message || err.message;
         errors.push(`${agent.name}: ${msg}`);
@@ -287,13 +310,13 @@ router.post('/fix-analysis', async (req, res) => {
       }
     }
 
-    const today = new Date().toISOString().slice(0, 10);
     res.json({
       updated,
       total: agents.length,
       tools_attached: toolIds.length,
       errors,
-      message: `✅ ${updated}/${agents.length} agents updated — today's date (${today}) injected + booking tools attached`,
+      today_injected: today,
+      message: `✅ ${updated}/${agents.length} agents updated — date (${fullDate}) injected in system prompt + tools attached`,
     });
   } catch (err) {
     res.status(500).json({ error: err.response?.data?.message || err.message });
