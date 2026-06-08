@@ -51,11 +51,11 @@
             <thead>
               <tr>
                 <th>Name</th><th>Email</th><th>Company</th>
-                <th>Calls This Month</th><th>Cost This Month</th><th>Created</th><th>Actions</th>
+                <th>Plan</th><th>Calls Used</th><th>Cost This Month</th><th>Created</th><th>Actions</th>
               </tr>
             </thead>
             <tbody id="clients-tbody">
-              <tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted)">Loading...</td></tr>
+              <tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted)">Loading...</td></tr>
             </tbody>
           </table>
         </div>
@@ -141,6 +141,13 @@
       </div>
       <hr style="border-color:var(--border);margin:16px 0">
       <div class="form-group">
+        <label class="form-label">📦 Plan</label>
+        <select id="edit-client-plan" class="form-control">
+          <option value="">— No Plan —</option>
+        </select>
+      </div>
+      <hr style="border-color:var(--border);margin:16px 0">
+      <div class="form-group">
         <label class="form-label">Retell AI API Key</label>
         <input type="text" id="edit-client-retell" class="form-control">
       </div>
@@ -164,13 +171,45 @@
 
 <script src="/js/app.js"></script>
 <script>
+let allPlans = [];
+
 document.addEventListener('DOMContentLoaded', async () => {
   if (!requireAuth()) return;
   const user = getUser();
   if (user?.role !== 'admin') { window.location.href = '/dashboard'; return; }
+  allPlans = (await apiGet('/plans').catch(() => ({ plans: [] }))).plans || [];
+  populatePlanDropdown();
   await loadClients();
   bindEvents();
 });
+
+function populatePlanDropdown() {
+  const sel = document.getElementById('edit-client-plan');
+  allPlans.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.id;
+    opt.textContent = `${p.name} — ${p.call_limit} calls / $${p.price_aud} AUD`;
+    sel.appendChild(opt);
+  });
+}
+
+function planBadgeHtml(planId, usageMap) {
+  const plan = allPlans.find(p => p.id === planId);
+  if (!plan) return '<span style="color:var(--text-muted);font-size:12px">No plan</span>';
+  const u = usageMap[planId] || {};
+  const pct = u.percent || 0;
+  const color = pct >= 100 ? '#ef4444' : pct >= 80 ? '#f59e0b' : 'var(--accent)';
+  return `
+    <div style="min-width:130px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <span style="font-size:12px;font-weight:600;color:${color}">${plan.name}</span>
+        <span style="font-size:11px;color:var(--text-muted)">${u.calls_used||0}/${plan.call_limit}</span>
+      </div>
+      <div style="height:5px;background:var(--surface2);border-radius:3px;overflow:hidden">
+        <div style="height:100%;width:${Math.min(pct,100)}%;background:${color};border-radius:3px"></div>
+      </div>
+    </div>`;
+}
 
 async function loadClients() {
   try {
@@ -182,11 +221,21 @@ async function loadClients() {
     const costMap = {};
     (costsData.clients || []).forEach(c => { costMap[c.id] = c; });
 
+    // Load usage for all clients that have a plan
+    const usageMap = {};
+    const clientsWithPlan = (clientsData.clients || []).filter(c => c.plan_id);
+    await Promise.all(clientsWithPlan.map(async c => {
+      try {
+        const u = await apiGet(`/plans/usage/${c.id}`);
+        usageMap[c.plan_id] = u;
+      } catch(_) {}
+    }));
+
     const tbody = document.getElementById('clients-tbody');
     const clients = clientsData.clients || [];
 
     if (!clients.length) {
-      tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">👤</div><p>No clients yet</p></div></td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">👤</div><p>No clients yet</p></div></td></tr>`;
       return;
     }
 
@@ -194,11 +243,10 @@ async function loadClients() {
       const cost = costMap[c.id] || {};
       return `
         <tr>
-          <td>
-            <div style="font-weight:500">${escHtml(c.name)}</div>
-          </td>
+          <td><div style="font-weight:500">${escHtml(c.name)}</div></td>
           <td style="color:var(--text-muted)">${escHtml(c.email)}</td>
           <td>${escHtml(c.company_name || '—')}</td>
+          <td>${planBadgeHtml(c.plan_id, usageMap)}</td>
           <td>${cost.total_calls || 0}</td>
           <td>${cost.total_cost ? '$' + parseFloat(cost.total_cost).toFixed(2) : '$0.00'}</td>
           <td style="color:var(--text-muted)">${fmtDateShort(c.created_at)}</td>
@@ -208,8 +256,7 @@ async function loadClients() {
               <button class="btn btn-danger btn-sm" onclick="deleteClient(${c.id}, '${escHtml(c.name)}')">🗑️</button>
             </div>
           </td>
-        </tr>
-      `;
+        </tr>`;
     }).join('');
   } catch (err) {
     toast('Failed to load clients: ' + err.message, 'error');
@@ -224,6 +271,7 @@ function editClient(id, data) {
   document.getElementById('edit-client-twilio-sid').value = data.twilio_account_sid || '';
   document.getElementById('edit-client-password').value = '';
   document.getElementById('edit-client-twilio-token').value = '';
+  document.getElementById('edit-client-plan').value = data.plan_id || '';
   openModal('edit-client-modal');
 }
 
@@ -246,7 +294,6 @@ function bindEvents() {
     const email = document.getElementById('new-client-email').value.trim();
     const password = document.getElementById('new-client-password').value;
     if (!name || !email || !password) { toast('Name, email and password required', 'warning'); return; }
-
     try {
       await apiPost('/clients', {
         name, email, password,
@@ -266,15 +313,19 @@ function bindEvents() {
 
   document.getElementById('update-client-btn')?.addEventListener('click', async () => {
     const id = document.getElementById('edit-client-id').value;
+    const planId = document.getElementById('edit-client-plan').value;
     try {
-      await apiPut(`/clients/${id}`, {
-        name: document.getElementById('edit-client-name').value,
-        company_name: document.getElementById('edit-client-company').value,
-        retell_api_key: document.getElementById('edit-client-retell').value,
-        twilio_account_sid: document.getElementById('edit-client-twilio-sid').value,
-        twilio_auth_token: document.getElementById('edit-client-twilio-token').value,
-        password: document.getElementById('edit-client-password').value || undefined,
-      });
+      await Promise.all([
+        apiPut(`/clients/${id}`, {
+          name: document.getElementById('edit-client-name').value,
+          company_name: document.getElementById('edit-client-company').value,
+          retell_api_key: document.getElementById('edit-client-retell').value,
+          twilio_account_sid: document.getElementById('edit-client-twilio-sid').value,
+          twilio_auth_token: document.getElementById('edit-client-twilio-token').value,
+          password: document.getElementById('edit-client-password').value || undefined,
+        }),
+        apiPut(`/plans/assign/${id}`, { plan_id: planId || null }),
+      ]);
       closeModal('edit-client-modal');
       toast('Client updated', 'success');
       loadClients();

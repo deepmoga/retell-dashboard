@@ -167,10 +167,32 @@ try {
 try { db.exec(`ALTER TABLE function_logs ADD COLUMN raw_request TEXT`); } catch(e) {}
 try { db.exec(`ALTER TABLE function_logs ADD COLUMN response_sent TEXT`); } catch(e) {}
 try { db.exec(`ALTER TABLE users ADD COLUMN timezone TEXT DEFAULT 'Australia/Sydney'`); } catch(e) {}
+try { db.exec(`ALTER TABLE users ADD COLUMN plan_id INTEGER`); } catch(e) {}
 // New table migrations — safe to re-run
 try { db.exec(`CREATE TABLE IF NOT EXISTS appointments (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, call_id TEXT, customer_name TEXT, customer_phone TEXT, customer_email TEXT, appointment_date TEXT NOT NULL, appointment_time TEXT NOT NULL, duration_minutes INTEGER DEFAULT 30, status TEXT DEFAULT 'pending', service_type TEXT, notes TEXT, confirmation_sent INTEGER DEFAULT 0, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`); } catch(e) {}
 try { db.exec(`CREATE TABLE IF NOT EXISTS working_hours (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, day_of_week INTEGER NOT NULL, is_open INTEGER DEFAULT 1, start_time TEXT DEFAULT '09:00', end_time TEXT DEFAULT '17:00', slot_duration INTEGER DEFAULT 30)`); } catch(e) {}
 try { db.exec(`CREATE TABLE IF NOT EXISTS email_settings (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL UNIQUE, smtp_host TEXT, smtp_port INTEGER DEFAULT 587, smtp_user TEXT, smtp_pass TEXT, from_name TEXT, from_email TEXT)`); } catch(e) {}
+try {
+  db.exec(`CREATE TABLE IF NOT EXISTS plans (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    call_limit INTEGER NOT NULL,
+    price_aud REAL DEFAULT 0,
+    overage_rate REAL DEFAULT 0.50,
+    features TEXT,
+    is_active INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+  // Seed default plans if table is empty
+  const planCount = db.prepare('SELECT COUNT(*) as c FROM plans').get().c;
+  if (planCount === 0) {
+    db.prepare(`INSERT INTO plans (name, call_limit, price_aud, overage_rate, features) VALUES (?,?,?,?,?)`).run('Starter',  100,  150, 0.50, 'Basic dashboard, 1 agent, Email support');
+    db.prepare(`INSERT INTO plans (name, call_limit, price_aud, overage_rate, features) VALUES (?,?,?,?,?)`).run('Growth',   300,  350, 0.50, 'Full dashboard, 2 agents, Priority support');
+    db.prepare(`INSERT INTO plans (name, call_limit, price_aud, overage_rate, features) VALUES (?,?,?,?,?)`).run('Pro',      500,  550, 0.45, 'Full dashboard, unlimited agents, Dedicated support');
+    db.prepare(`INSERT INTO plans (name, call_limit, price_aud, overage_rate, features) VALUES (?,?,?,?,?)`).run('Enterprise', 1000, 950, 0.40, 'Custom setup, white-label, SLA support');
+    console.log('[DB] Default plans seeded');
+  }
+} catch(e) {}
 
 function initDatabase() {
   console.log('[DB] Database initialized at', DB_PATH);
@@ -196,7 +218,7 @@ function seedAdmin() {
 const userQueries = {
   findByEmail: db.prepare('SELECT * FROM users WHERE email = ?'),
   findById: db.prepare('SELECT id, name, email, role, company_name, logo_url, retell_api_key, vapi_api_key, twilio_account_sid, twilio_auth_token, created_at FROM users WHERE id = ?'),
-  findAll: db.prepare('SELECT id, name, email, role, company_name, created_at FROM users ORDER BY created_at DESC'),
+  findAll: db.prepare('SELECT id, name, email, role, company_name, plan_id, created_at FROM users ORDER BY created_at DESC'),
   create: db.prepare(`
     INSERT INTO users (name, email, password, role, company_name, retell_api_key, twilio_account_sid, twilio_auth_token)
     VALUES (@name, @email, @password, @role, @company_name, @retell_api_key, @twilio_account_sid, @twilio_auth_token)
@@ -369,6 +391,42 @@ function getDashboardStats(userId) {
   };
 }
 
+// --- Plan queries ---
+const planQueries = {
+  findAll:   db.prepare('SELECT * FROM plans ORDER BY call_limit ASC'),
+  findById:  db.prepare('SELECT * FROM plans WHERE id = ?'),
+  create:    db.prepare(`INSERT INTO plans (name, call_limit, price_aud, overage_rate, features) VALUES (@name, @call_limit, @price_aud, @overage_rate, @features)`),
+  update:    db.prepare(`UPDATE plans SET name=@name, call_limit=@call_limit, price_aud=@price_aud, overage_rate=@overage_rate, features=@features WHERE id=@id`),
+  delete:    db.prepare('DELETE FROM plans WHERE id = ?'),
+  assignToUser: db.prepare('UPDATE users SET plan_id=? WHERE id=?'),
+};
+
+function getPlanUsage(userId) {
+  const user = db.prepare('SELECT plan_id FROM users WHERE id=?').get(userId);
+  const plan = user?.plan_id ? planQueries.findById.get(user.plan_id) : null;
+
+  const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0,0,0,0);
+  const callsUsed = db.prepare(
+    `SELECT COUNT(*) as c FROM calls WHERE user_id=? AND status='ended' AND start_timestamp>=?`
+  ).get(userId, monthStart.getTime())?.c || 0;
+
+  const limit = plan?.call_limit || null;
+  const remaining = limit !== null ? Math.max(0, limit - callsUsed) : null;
+  const percent = limit ? Math.min(100, Math.round((callsUsed / limit) * 100)) : 0;
+  const month = new Date().toLocaleDateString('en-AU', { month: 'long', year: 'numeric' });
+
+  return {
+    plan: plan || null,
+    calls_used: callsUsed,
+    calls_limit: limit,
+    calls_remaining: remaining,
+    percent,
+    month,
+    warning:  limit !== null && percent >= 80 && percent < 100,
+    exceeded: limit !== null && callsUsed >= limit,
+  };
+}
+
 module.exports = {
   db,
   initDatabase,
@@ -382,4 +440,6 @@ module.exports = {
   getMonthlySummary,
   getCostByClient,
   getDashboardStats,
+  planQueries,
+  getPlanUsage,
 };
