@@ -1,5 +1,6 @@
 // VAPI Tool Webhook Handler — with full debug logging + timezone support
 const express = require('express');
+const twilio = require('twilio');
 const { db } = require('../database/db');
 const gcal = require('../services/google-calendar');
 
@@ -95,7 +96,7 @@ function tryParse(str) {
 
 // ── Unified handler ───────────────────────────────────────────────────────────
 
-router.post('/:userId/call', (req, res) => {
+router.post('/:userId/call', async (req, res) => {
   const userId = parseInt(req.params.userId);
   const rawBody = JSON.stringify(req.body);
   console.log(`[VAPI Tool] /call userId=${userId} raw:`, rawBody.slice(0, 800));
@@ -111,6 +112,12 @@ router.post('/:userId/call', (req, res) => {
 
     console.log(`[VAPI Tool] fn=${parsed.fnName} format=${parsed.format} args=`, parsed.args);
 
+    if (parsed.fnName === 'getInsuranceTypes') {
+      return handleGetInsuranceTypes(userId, res, parsed.toolCallId, parsed.callId, rawBody);
+    }
+    if (parsed.fnName === 'sendInsuranceLink') {
+      return await handleSendInsuranceLink(userId, parsed.args, res, parsed.toolCallId, parsed.callId, rawBody);
+    }
     if (parsed.fnName === 'getTodayDate') {
       return handleGetTodayDate(userId, res, parsed.toolCallId, parsed.callId, rawBody);
     }
@@ -338,6 +345,110 @@ function handleBookAppointment(userId, args, res, toolCallId, callId, rawBody) {
     console.error('[bookAppointment] CRASH:', err.message, err.stack);
     const resp = 'Error saving booking. Please try again.';
     saveLog(userId, 'bookAppointment', args, `CRASH: ${err.message}`, 'error', callId, rawBody, resp);
+    return sendResult(res, toolCallId, resp);
+  }
+}
+
+// ── getInsuranceTypes ─────────────────────────────────────────────────────────
+
+function handleGetInsuranceTypes(userId, res, toolCallId, callId, rawBody) {
+  try {
+    const types = db.prepare(
+      "SELECT label, type_key, description FROM insurance_types WHERE user_id=? AND is_active=1 ORDER BY label"
+    ).all(userId);
+
+    if (!types.length) {
+      const resp = 'No insurance types are configured for this vendor yet.';
+      saveLog(userId, 'getInsuranceTypes', {}, resp, 'error', callId, rawBody, resp);
+      return sendResult(res, toolCallId, resp);
+    }
+
+    const list = types.map(t => `"${t.type_key}" (${t.label}${t.description ? ': ' + t.description : ''})`).join(', ');
+    const resp = `Available insurance types: ${list}. Use the type_key exactly when calling sendInsuranceLink.`;
+    saveLog(userId, 'getInsuranceTypes', {}, resp, 'success', callId, rawBody, resp);
+    return sendResult(res, toolCallId, resp);
+  } catch (err) {
+    const resp = 'Error fetching insurance types.';
+    saveLog(userId, 'getInsuranceTypes', {}, `CRASH: ${err.message}`, 'error', callId, rawBody, resp);
+    return sendResult(res, toolCallId, resp);
+  }
+}
+
+// ── sendInsuranceLink ─────────────────────────────────────────────────────────
+
+async function handleSendInsuranceLink(userId, args, res, toolCallId, callId, rawBody) {
+  try {
+    const { customer_name, customer_phone, customer_email, insurance_type } = args;
+    console.log(`[sendInsuranceLink] userId=${userId} type=${insurance_type} phone=${customer_phone}`);
+
+    if (!customer_phone || !insurance_type) {
+      const resp = `Missing required info: ${!customer_phone ? 'customer_phone ' : ''}${!insurance_type ? 'insurance_type' : ''}. Please collect these before sending the link.`;
+      saveLog(userId, 'sendInsuranceLink', args, 'ERROR: missing fields', 'error', callId, rawBody, resp);
+      return sendResult(res, toolCallId, resp);
+    }
+
+    // Look up insurance type (exact key first, then label fallback)
+    let insType = db.prepare(
+      "SELECT * FROM insurance_types WHERE user_id=? AND type_key=? AND is_active=1"
+    ).get(userId, insurance_type);
+
+    if (!insType) {
+      insType = db.prepare(
+        "SELECT * FROM insurance_types WHERE user_id=? AND is_active=1 AND LOWER(label) LIKE ?"
+      ).get(userId, `%${insurance_type.toLowerCase()}%`);
+    }
+
+    if (!insType) {
+      const available = db.prepare("SELECT label, type_key FROM insurance_types WHERE user_id=? AND is_active=1").all(userId)
+        .map(t => `${t.type_key}`).join(', ');
+      const resp = `Insurance type "${insurance_type}" not found. Valid types: ${available || 'none configured'}. Please ask the customer to clarify.`;
+      saveLog(userId, 'sendInsuranceLink', args, `NOT_FOUND: ${insurance_type}`, 'error', callId, rawBody, resp);
+      return sendResult(res, toolCallId, resp);
+    }
+
+    // Send SMS
+    let smsStatus = 'pending';
+    const vendor = db.prepare('SELECT twilio_account_sid, twilio_auth_token, twilio_phone_number FROM users WHERE id=?').get(userId);
+
+    if (vendor?.twilio_account_sid && vendor?.twilio_auth_token && vendor?.twilio_phone_number) {
+      try {
+        const client = twilio(vendor.twilio_account_sid, vendor.twilio_auth_token);
+        const smsBody = `Hi ${customer_name || 'there'}! Here is your ${insType.label} form: ${insType.form_url}\n\nFor queries, call us back anytime.`;
+        await client.messages.create({ body: smsBody, from: vendor.twilio_phone_number, to: customer_phone });
+        smsStatus = 'sent';
+        console.log(`[sendInsuranceLink] SMS sent to ${customer_phone}`);
+      } catch (smsErr) {
+        smsStatus = 'failed';
+        console.error('[sendInsuranceLink] SMS error:', smsErr.message);
+      }
+    } else {
+      smsStatus = 'no_twilio';
+    }
+
+    // Save enquiry
+    const result = db.prepare(`
+      INSERT INTO insurance_enquiries (user_id, call_id, customer_name, customer_phone, customer_email,
+        insurance_type, insurance_label, form_url, sms_status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(userId, callId || null, customer_name || '', customer_phone, customer_email || '',
+      insType.type_key, insType.label, insType.form_url, smsStatus);
+
+    const enquiryId = result.lastInsertRowid;
+
+    let resp;
+    if (smsStatus === 'sent') {
+      resp = `The ${insType.label} form link has been sent to ${customer_phone} via SMS. Enquiry #${enquiryId} saved. Our team will follow up with ${customer_name || 'the customer'} shortly. Is there anything else I can help with?`;
+    } else {
+      resp = `Enquiry #${enquiryId} saved for ${insType.label}. ${smsStatus === 'no_twilio' ? 'SMS not configured — team will follow up manually.' : 'SMS delivery failed — team will follow up manually.'} Customer: ${customer_name || ''} ${customer_phone}.`;
+    }
+
+    saveLog(userId, 'sendInsuranceLink', args, `SUCCESS: Enquiry #${enquiryId} sms=${smsStatus}`, 'success', callId, rawBody, resp);
+    return sendResult(res, toolCallId, resp);
+
+  } catch (err) {
+    console.error('[sendInsuranceLink] CRASH:', err.message);
+    const resp = 'Error processing insurance enquiry. Please try again.';
+    saveLog(userId, 'sendInsuranceLink', args, `CRASH: ${err.message}`, 'error', callId, rawBody, resp);
     return sendResult(res, toolCallId, resp);
   }
 }

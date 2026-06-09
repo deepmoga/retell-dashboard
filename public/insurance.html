@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Insurance — VoiceAgent</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">V</div>
+      <div><div class="logo-text">VoiceAgent</div><div class="logo-sub">Dashboard</div></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Main</div>
+      <a class="nav-item" href="/dashboard" data-page="dashboard"><span class="nav-icon">📊</span><span class="nav-label">Dashboard</span></a>
+      <a class="nav-item" href="/agents" data-page="agents" data-hide-readonly><span class="nav-icon">🤖</span><span class="nav-label">Agent Builder</span></a>
+      <a class="nav-item" href="/calls" data-page="calls"><span class="nav-icon">📞</span><span class="nav-label">Call Logs</span></a>
+      <a class="nav-item" href="/live" data-page="live"><span class="nav-icon">🔴</span><span class="nav-label">Live Calls</span></a>
+      <a class="nav-item" href="/analytics" data-page="analytics"><span class="nav-icon">📈</span><span class="nav-label">Analytics</span></a>
+      <a class="nav-item" href="/leads" data-page="leads"><span class="nav-icon">👥</span><span class="nav-label">Leads</span></a>
+      <a class="nav-item" href="/appointments" data-page="appointments"><span class="nav-icon">📅</span><span class="nav-label">Appointments</span></a>
+      <a class="nav-item active" href="/insurance" data-page="insurance"><span class="nav-icon">🛡️</span><span class="nav-label">Insurance</span></a>
+      <a class="nav-item" href="/costs" data-page="costs" data-admin-only><span class="nav-icon">💰</span><span class="nav-label">Cost Tracker</span></a>
+      <div class="nav-section">Account</div>
+      <a class="nav-item" href="/settings" data-page="settings"><span class="nav-icon">🔑</span><span class="nav-label">Settings</span></a>
+      <div class="nav-section" data-admin-only>Admin</div>
+      <a class="nav-item" href="/clients" data-page="clients" data-admin-only><span class="nav-icon">⚙️</span><span class="nav-label">Clients</span></a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar" id="sidebar-user-avatar">A</div>
+        <div><div class="user-name" id="sidebar-user-name">Loading...</div><div class="user-role" id="sidebar-user-role"></div></div>
+      </div>
+      <div id="readonly-badge" style="display:none;background:rgba(245,158,11,.15);color:#f59e0b;font-size:11px;font-weight:600;padding:4px 10px;border-radius:6px;text-align:center;margin-bottom:8px">👁 Read-Only Mode</div>
+      <button id="logout-btn" class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:10px">🚪 Logout</button>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <div class="page-header">
+      <div>
+        <div class="page-title">🛡️ Insurance</div>
+        <div class="page-sub">Manage insurance types, form links & enquiries from AI calls</div>
+      </div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-secondary" id="vapi-info-btn">🤖 VAPI Setup</button>
+        <button class="btn btn-primary" id="add-type-btn" data-hide-readonly>+ Add Insurance Type</button>
+      </div>
+    </div>
+
+    <!-- Stats row -->
+    <div class="stats-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:24px">
+      <div class="stat-card">
+        <div class="stat-label">Total Enquiries</div>
+        <div class="stat-value" id="stat-total">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">SMS Sent</div>
+        <div class="stat-value" id="stat-sent">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Insurance Types</div>
+        <div class="stat-value" id="stat-types">—</div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div style="display:flex;gap:4px;margin-bottom:20px;border-bottom:1px solid var(--border)">
+      <button class="tab-btn active" data-tab="enquiries" onclick="switchTab('enquiries')">📋 Enquiries</button>
+      <button class="tab-btn" data-tab="types" onclick="switchTab('types')">🗂️ Insurance Types</button>
+    </div>
+
+    <!-- Enquiries Tab -->
+    <div id="tab-enquiries">
+      <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
+        <select id="filter-type" class="form-control" style="width:180px" onchange="loadEnquiries()">
+          <option value="all">All Types</option>
+        </select>
+        <input type="date" id="filter-from" class="form-control" style="width:150px" onchange="loadEnquiries()">
+        <input type="date" id="filter-to" class="form-control" style="width:150px" onchange="loadEnquiries()">
+        <button class="btn btn-ghost btn-sm" onclick="clearFilters()">Clear</button>
+      </div>
+      <div class="table-container">
+        <table class="table">
+          <thead><tr>
+            <th>#</th>
+            <th>Customer</th>
+            <th>Phone</th>
+            <th>Email</th>
+            <th>Insurance Type</th>
+            <th>SMS Status</th>
+            <th>Date</th>
+            <th></th>
+          </tr></thead>
+          <tbody id="enquiries-tbody">
+            <tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:40px">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Types Tab -->
+    <div id="tab-types" style="display:none">
+      <div class="table-container">
+        <table class="table">
+          <thead><tr>
+            <th>Label</th>
+            <th>Type Key</th>
+            <th>Form URL</th>
+            <th>Description</th>
+            <th>Status</th>
+            <th data-hide-readonly></th>
+          </tr></thead>
+          <tbody id="types-tbody">
+            <tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:40px">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Add/Edit Insurance Type Modal -->
+<div class="modal-overlay" id="type-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="type-modal-title">Add Insurance Type</div>
+      <button class="modal-close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-type-id">
+      <div class="form-group">
+        <label class="form-label">Label <span style="color:var(--danger)">*</span></label>
+        <input type="text" id="type-label" class="form-control" placeholder="e.g. Car Insurance">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Type Key <span style="color:var(--danger)">*</span> <span style="color:var(--text-muted);font-size:11px">(agent uses this — no spaces)</span></label>
+        <input type="text" id="type-key" class="form-control" placeholder="e.g. car_insurance">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Form URL <span style="color:var(--danger)">*</span></label>
+        <input type="url" id="type-url" class="form-control" placeholder="https://forms.example.com/car-insurance">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description <span style="color:var(--text-muted);font-size:11px">(optional — agent reads this to customer)</span></label>
+        <input type="text" id="type-desc" class="form-control" placeholder="e.g. Covers personal vehicles and third party">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary modal-close">Cancel</button>
+      <button class="btn btn-primary" id="save-type-btn">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- VAPI Setup Info Modal -->
+<div class="modal-overlay" id="vapi-modal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <div class="modal-title">🤖 VAPI Agent Setup</div>
+      <button class="modal-close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p style="color:var(--text-muted);font-size:13px;margin-bottom:16px">Add these 2 tools to your VAPI agent. Tool endpoint URL:</p>
+      <div style="background:var(--surface2);padding:12px;border-radius:8px;font-family:monospace;font-size:13px;margin-bottom:20px;word-break:break-all" id="vapi-endpoint-url">Loading...</div>
+
+      <div style="margin-bottom:20px">
+        <div style="font-weight:600;margin-bottom:8px">Tool 1: <code>getInsuranceTypes</code></div>
+        <div style="font-size:13px;color:var(--text-muted);margin-bottom:8px">Call this at start of conversation — returns list of insurance types available.</div>
+        <pre style="background:var(--surface2);padding:12px;border-radius:8px;font-size:12px;overflow-x:auto">{
+  "name": "getInsuranceTypes",
+  "description": "Get the list of insurance types available for this vendor",
+  "parameters": { "type": "object", "properties": {} }
+}</pre>
+      </div>
+
+      <div style="margin-bottom:20px">
+        <div style="font-weight:600;margin-bottom:8px">Tool 2: <code>sendInsuranceLink</code></div>
+        <div style="font-size:13px;color:var(--text-muted);margin-bottom:8px">Call after collecting customer info — sends SMS with form link and saves enquiry.</div>
+        <pre style="background:var(--surface2);padding:12px;border-radius:8px;font-size:12px;overflow-x:auto">{
+  "name": "sendInsuranceLink",
+  "description": "Send the insurance form link to customer via SMS and save enquiry",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "customer_name":  { "type": "string", "description": "Full name of the customer" },
+      "customer_phone": { "type": "string", "description": "Customer phone number with country code" },
+      "customer_email": { "type": "string", "description": "Customer email address" },
+      "insurance_type": { "type": "string", "description": "Insurance type key from getInsuranceTypes" }
+    },
+    "required": ["customer_phone", "insurance_type"]
+  }
+}</pre>
+      </div>
+
+      <div style="background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.3);border-radius:8px;padding:14px;font-size:13px">
+        <div style="font-weight:600;margin-bottom:6px">Suggested Agent System Prompt</div>
+        <div style="color:var(--text-muted)" id="system-prompt-text">Loading...</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary modal-close">Close</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/common.js"></script>
+<script>
+const API = '';
+let currentUserId = null;
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.getElementById('tab-enquiries').style.display = tab === 'enquiries' ? '' : 'none';
+  document.getElementById('tab-types').style.display     = tab === 'types'     ? '' : 'none';
+  if (tab === 'types') loadTypes();
+}
+
+// ── Load enquiries ────────────────────────────────────────────────────────────
+async function loadEnquiries() {
+  const type = document.getElementById('filter-type').value;
+  const from = document.getElementById('filter-from').value;
+  const to   = document.getElementById('filter-to').value;
+  const params = new URLSearchParams();
+  if (type && type !== 'all') params.set('type', type);
+  if (from) params.set('from_date', from);
+  if (to)   params.set('to_date', to);
+
+  try {
+    const data = await apiGet('/insurance/enquiries?' + params);
+    const rows = data.enquiries || [];
+    const tbody = document.getElementById('enquiries-tbody');
+
+    document.getElementById('stat-total').textContent = rows.length;
+    document.getElementById('stat-sent').textContent  = rows.filter(r => r.sms_status === 'sent').length;
+
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:40px">No enquiries yet. Enquiries appear here when the AI agent collects customer info during a call.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = rows.map(r => `
+      <tr>
+        <td style="color:var(--text-muted);font-size:12px">#${r.id}</td>
+        <td style="font-weight:500">${esc(r.customer_name || '—')}</td>
+        <td>${esc(r.customer_phone || '—')}</td>
+        <td style="font-size:12px">${esc(r.customer_email || '—')}</td>
+        <td><span style="background:var(--surface2);padding:2px 8px;border-radius:10px;font-size:12px">${esc(r.insurance_label || r.insurance_type)}</span></td>
+        <td>${smsBadge(r.sms_status)}</td>
+        <td style="font-size:12px;color:var(--text-muted)">${formatDate(r.created_at)}</td>
+        <td>
+          ${r.form_url ? `<a href="${esc(r.form_url)}" target="_blank" class="btn btn-ghost btn-sm" title="View form">🔗</a>` : ''}
+          <button class="btn btn-ghost btn-sm" onclick="deleteEnquiry(${r.id})" title="Delete" data-hide-readonly>🗑️</button>
+        </td>
+      </tr>
+    `).join('');
+    applyReadonly();
+  } catch (err) {
+    document.getElementById('enquiries-tbody').innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--danger)">Error: ${err.message}</td></tr>`;
+  }
+}
+
+// ── Load types ────────────────────────────────────────────────────────────────
+async function loadTypes() {
+  try {
+    const data = await apiGet('/insurance/types');
+    const types = data.types || [];
+    document.getElementById('stat-types').textContent = types.length;
+
+    // Populate filter dropdown
+    const sel = document.getElementById('filter-type');
+    const curr = sel.value;
+    sel.innerHTML = '<option value="all">All Types</option>' +
+      types.map(t => `<option value="${esc(t.type_key)}" ${curr === t.type_key ? 'selected' : ''}>${esc(t.label)}</option>`).join('');
+
+    const tbody = document.getElementById('types-tbody');
+    if (!types.length) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:40px">No insurance types added yet. Click "+ Add Insurance Type" to get started.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = types.map(t => `
+      <tr>
+        <td style="font-weight:600">${esc(t.label)}</td>
+        <td><code style="background:var(--surface2);padding:2px 6px;border-radius:4px;font-size:12px">${esc(t.type_key)}</code></td>
+        <td style="font-size:12px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+          <a href="${esc(t.form_url)}" target="_blank" style="color:var(--accent)">${esc(t.form_url)}</a>
+        </td>
+        <td style="font-size:12px;color:var(--text-muted)">${esc(t.description || '—')}</td>
+        <td><span style="color:${t.is_active ? 'var(--accent)' : 'var(--text-muted)'};">${t.is_active ? '● Active' : '○ Inactive'}</span></td>
+        <td data-hide-readonly>
+          <button class="btn btn-ghost btn-sm" onclick="editType(${JSON.stringify(t).replace(/"/g,'&quot;')})">✏️</button>
+          <button class="btn btn-ghost btn-sm" onclick="deleteType(${t.id})">🗑️</button>
+        </td>
+      </tr>
+    `).join('');
+    applyReadonly();
+  } catch (err) {
+    document.getElementById('types-tbody').innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--danger)">Error: ${err.message}</td></tr>`;
+  }
+}
+
+// ── CRUD helpers ──────────────────────────────────────────────────────────────
+function openAddModal() {
+  document.getElementById('type-modal-title').textContent = 'Add Insurance Type';
+  document.getElementById('edit-type-id').value = '';
+  document.getElementById('type-label').value = '';
+  document.getElementById('type-key').value = '';
+  document.getElementById('type-url').value = '';
+  document.getElementById('type-desc').value = '';
+  openModal('type-modal');
+}
+
+function editType(t) {
+  document.getElementById('type-modal-title').textContent = 'Edit Insurance Type';
+  document.getElementById('edit-type-id').value = t.id;
+  document.getElementById('type-label').value = t.label;
+  document.getElementById('type-key').value = t.type_key;
+  document.getElementById('type-url').value = t.form_url;
+  document.getElementById('type-desc').value = t.description || '';
+  openModal('type-modal');
+}
+
+document.getElementById('type-label').addEventListener('input', function() {
+  const keyEl = document.getElementById('type-key');
+  if (!document.getElementById('edit-type-id').value) {
+    keyEl.value = this.value.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+  }
+});
+
+document.getElementById('save-type-btn').addEventListener('click', async () => {
+  const id    = document.getElementById('edit-type-id').value;
+  const label = document.getElementById('type-label').value.trim();
+  const key   = document.getElementById('type-key').value.trim();
+  const url   = document.getElementById('type-url').value.trim();
+  const desc  = document.getElementById('type-desc').value.trim();
+
+  if (!label || !key || !url) { toast('Label, Type Key, and URL are required', 'warning'); return; }
+
+  try {
+    if (id) {
+      await apiPut(`/insurance/types/${id}`, { label, type_key: key, form_url: url, description: desc });
+    } else {
+      await apiPost('/insurance/types', { label, type_key: key, form_url: url, description: desc });
+    }
+    closeModal('type-modal');
+    toast(id ? 'Insurance type updated!' : 'Insurance type added!', 'success');
+    loadTypes();
+  } catch (err) { toast('Error: ' + err.message, 'error'); }
+});
+
+async function deleteType(id) {
+  if (!confirm('Delete this insurance type?')) return;
+  try {
+    await apiDelete(`/insurance/types/${id}`);
+    toast('Deleted', 'success');
+    loadTypes();
+  } catch (err) { toast('Error: ' + err.message, 'error'); }
+}
+
+async function deleteEnquiry(id) {
+  if (!confirm('Delete this enquiry?')) return;
+  try {
+    await apiDelete(`/insurance/enquiries/${id}`);
+    toast('Deleted', 'success');
+    loadEnquiries();
+  } catch (err) { toast('Error: ' + err.message, 'error'); }
+}
+
+function clearFilters() {
+  document.getElementById('filter-type').value = 'all';
+  document.getElementById('filter-from').value = '';
+  document.getElementById('filter-to').value   = '';
+  loadEnquiries();
+}
+
+// ── VAPI info modal ───────────────────────────────────────────────────────────
+document.getElementById('vapi-info-btn').addEventListener('click', async () => {
+  try {
+    const profile = await apiGet('/auth/me');
+    const uid = profile.user?.id || '';
+    const base = window.location.origin;
+    const endpoint = `${base}/api/vapi-tools/${uid}/call`;
+    document.getElementById('vapi-endpoint-url').textContent = endpoint;
+    document.getElementById('system-prompt-text').textContent =
+      `You are a helpful insurance enquiry assistant for ${profile.user?.company_name || 'our company'}. ` +
+      `When a customer calls:\n1. Greet them warmly\n2. Call getInsuranceTypes to know available products\n` +
+      `3. Ask what type of insurance they need\n4. Collect their full name, phone number, and email\n` +
+      `5. Call sendInsuranceLink with their details and the insurance_type key\n` +
+      `6. Confirm the form link has been sent to their phone\n7. Ask if there is anything else you can help with`;
+    openModal('vapi-modal');
+  } catch(err) { toast('Error: ' + err.message, 'error'); }
+});
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function smsBadge(status) {
+  const map = {
+    sent:      ['var(--accent)', '✓ Sent'],
+    failed:    ['var(--danger)', '✗ Failed'],
+    no_twilio: ['#f59e0b',       '⚠ No Twilio'],
+    pending:   ['var(--text-muted)', '… Pending'],
+  };
+  const [color, label] = map[status] || ['var(--text-muted)', status];
+  return `<span style="color:${color};font-size:12px;font-weight:600">${label}</span>`;
+}
+
+function formatDate(dt) {
+  if (!dt) return '—';
+  return new Date(dt).toLocaleString('en-AU', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+}
+
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+document.getElementById('add-type-btn').addEventListener('click', openAddModal);
+
+(async () => {
+  await loadEnquiries();
+  await loadTypes();
+})();
+</script>
+</body>
+</html>

@@ -175,6 +175,37 @@ try { db.exec(`ALTER TABLE users ADD COLUMN google_refresh_token TEXT`); } catch
 try { db.exec(`ALTER TABLE users ADD COLUMN google_calendar_id TEXT DEFAULT 'primary'`); } catch(e) {}
 try { db.exec(`ALTER TABLE appointments ADD COLUMN google_event_id TEXT`); } catch(e) {}
 try { db.exec(`ALTER TABLE working_hours ADD COLUMN max_concurrent_bookings INTEGER DEFAULT 1`); } catch(e) {}
+try { db.exec(`ALTER TABLE users ADD COLUMN twilio_phone_number TEXT`); } catch(e) {}
+try {
+  db.exec(`CREATE TABLE IF NOT EXISTS insurance_types (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    label TEXT NOT NULL,
+    type_key TEXT NOT NULL,
+    form_url TEXT NOT NULL,
+    description TEXT,
+    is_active INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  )`);
+} catch(e) {}
+try {
+  db.exec(`CREATE TABLE IF NOT EXISTS insurance_enquiries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    call_id TEXT,
+    customer_name TEXT,
+    customer_phone TEXT,
+    customer_email TEXT,
+    insurance_type TEXT,
+    insurance_label TEXT,
+    form_url TEXT,
+    sms_status TEXT DEFAULT 'pending',
+    notes TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  )`);
+} catch(e) {}
 // New table migrations — safe to re-run
 try { db.exec(`CREATE TABLE IF NOT EXISTS appointments (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, call_id TEXT, customer_name TEXT, customer_phone TEXT, customer_email TEXT, appointment_date TEXT NOT NULL, appointment_time TEXT NOT NULL, duration_minutes INTEGER DEFAULT 30, status TEXT DEFAULT 'pending', service_type TEXT, notes TEXT, confirmation_sent INTEGER DEFAULT 0, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`); } catch(e) {}
 try { db.exec(`CREATE TABLE IF NOT EXISTS working_hours (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, day_of_week INTEGER NOT NULL, is_open INTEGER DEFAULT 1, start_time TEXT DEFAULT '09:00', end_time TEXT DEFAULT '17:00', slot_duration INTEGER DEFAULT 30)`); } catch(e) {}

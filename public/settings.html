@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -21,6 +21,7 @@
       <a class="nav-item" href="/calls" data-page="calls"><span class="nav-icon">📞</span><span class="nav-label">Call Logs</span></a>
       <a class="nav-item" href="/live" data-page="live"><span class="nav-icon">🔴</span><span class="nav-label">Live Calls</span></a>
       <a class="nav-item" href="/appointments" data-page="appointments"><span class="nav-icon">📅</span><span class="nav-label">Appointments</span></a>
+      <a class="nav-item" href="/insurance" data-page="insurance"><span class="nav-icon">🛡️</span><span class="nav-label">Insurance</span></a>
       <a class="nav-item" href="/analytics" data-page="analytics"><span class="nav-icon">📈</span><span class="nav-label">Analytics</span></a>
       <a class="nav-item" href="/leads" data-page="leads"><span class="nav-icon">👥</span><span class="nav-label">Leads</span></a>
       <a class="nav-item" href="/costs" data-page="costs" data-admin-only><span class="nav-icon">💰</span><span class="nav-label">Cost Tracker</span></a>
@@ -115,8 +116,14 @@
                 </div>
               </div>
             </div>
+            <div class="form-row" style="margin-top:12px">
+              <div class="form-group">
+                <label class="form-label">SMS From Number <span style="color:var(--text-muted);font-size:11px">(for Insurance SMS)</span></label>
+                <input type="text" id="twilio-phone" class="form-control" placeholder="+61400000000">
+              </div>
+            </div>
             <div style="font-size:11px;color:var(--text-muted)">
-              console.twilio.com → Account Info → Copy
+              console.twilio.com → Account Info → Copy · Phone number: twilio.com/console/phone-numbers
             </div>
           </div>
 
@@ -303,6 +310,9 @@ async function loadProfile() {
       document.getElementById('twilio-sid').value = u.twilio_account_sid;
       setStatus('twilio-status', '✓ Set', 'var(--accent)');
     }
+    if (u.twilio_phone_number) {
+      document.getElementById('twilio-phone').value = u.twilio_phone_number;
+    }
   } catch (err) {
     toast('Failed to load profile', 'error');
   }
@@ -390,6 +400,7 @@ function bindEvents() {
         vapi_api_key: vapi,
         twilio_account_sid: sid,
         twilio_auth_token: token,
+        twilio_phone_number: document.getElementById('twilio-phone').value.trim(),
       });
 
       if (retell) setStatus('retell-status', '✓ Set', 'var(--accent)');
