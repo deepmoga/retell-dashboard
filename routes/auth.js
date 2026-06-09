@@ -88,7 +88,7 @@ router.put('/profile', authMiddleware, async (req, res) => {
       vapi_api_key: vapi_api_key ?? user.vapi_api_key ?? '',
       twilio_account_sid: twilio_account_sid ?? user.twilio_account_sid ?? '',
       twilio_auth_token: twilio_auth_token ?? user.twilio_auth_token ?? '',
-      twilio_phone_number: twilio_phone_number ?? user.twilio_phone_number ?? '',
+      twilio_phone_number: twilio_phone_number || user.twilio_phone_number || '',
       timezone: timezone || user.timezone || 'Australia/Sydney',
       id: req.user.userId,
     });

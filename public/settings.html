@@ -310,6 +310,9 @@ async function loadProfile() {
       document.getElementById('twilio-sid').value = u.twilio_account_sid;
       setStatus('twilio-status', '✓ Set', 'var(--accent)');
     }
+    if (u.twilio_auth_token) {
+      document.getElementById('twilio-token').value = u.twilio_auth_token;
+    }
     if (u.twilio_phone_number) {
       document.getElementById('twilio-phone').value = u.twilio_phone_number;
     }
