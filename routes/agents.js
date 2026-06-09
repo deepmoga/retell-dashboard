@@ -280,8 +280,14 @@ router.post('/fix-analysis', async (req, res) => {
     let updated = 0;
     const errors = [];
 
+    // Insurance agents use different tools — never attach booking tools to them
+    const INSURANCE_KEYWORDS = ['insurance', 'insur'];
+    const isInsuranceAgent = (name) => INSURANCE_KEYWORDS.some(k => (name || '').toLowerCase().includes(k));
+
     for (const agent of agents) {
       try {
+        const skipBookingTools = isInsuranceAgent(agent.name);
+
         // Step 1: Get current system prompt, prepend today's date
         try {
           const current = await vapi.getAssistant(apiKey, agent.id);
@@ -298,13 +304,13 @@ router.post('/fix-analysis', async (req, res) => {
         // Step 2: update analysisPlan
         await vapi.updateAssistant(apiKey, agent.id, { analysisPlan: plan });
 
-        // Step 3: attach toolIds inside model (VAPI rejects toolIds at top level)
-        if (toolIds.length > 0) {
+        // Step 3: attach toolIds — skip for insurance agents (they use getInsuranceTypes + sendInsuranceLink)
+        if (toolIds.length > 0 && !skipBookingTools) {
           const cur2 = await vapi.getAssistant(apiKey, agent.id);
           await vapi.updateAssistant(apiKey, agent.id, { model: { ...(cur2?.model || {}), toolIds } });
         }
         updated++;
-        console.log(`[Fix] Updated agent: ${agent.name} (${agent.id}) — prompt + plan + tools`);
+        console.log(`[Fix] Updated agent: ${agent.name} (${agent.id}) — prompt + plan${skipBookingTools ? ' (booking tools SKIPPED — insurance agent)' : ' + tools'}`);
       } catch (err) {
         const msg = err.response?.data?.message || err.message;
         errors.push(`${agent.name}: ${msg}`);
