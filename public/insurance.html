@@ -248,6 +248,36 @@
   </div>
 </div>
 
+<!-- Edit Enquiry Modal -->
+<div class="modal-overlay" id="edit-enquiry-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">✏️ Edit Enquiry</div>
+      <button class="modal-close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-enq-id">
+      <div class="form-group">
+        <label class="form-label">Customer Name</label>
+        <input type="text" id="edit-enq-name" class="form-control" placeholder="Full name">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Phone Number <span style="color:var(--danger)">*</span></label>
+        <input type="tel" id="edit-enq-phone" class="form-control" placeholder="+919780551900">
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Format: +91 followed by 10 digits (e.g. +919780551900)</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input type="email" id="edit-enq-email" class="form-control" placeholder="customer@email.com">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary modal-close">Cancel</button>
+      <button class="btn btn-primary" id="save-enq-btn">💾 Save Changes</button>
+    </div>
+  </div>
+</div>
+
 <!-- VAPI Setup Info Modal -->
 <div class="modal-overlay" id="vapi-modal">
   <div class="modal modal-lg">
@@ -348,6 +378,7 @@ async function loadEnquiries() {
         <td style="font-size:12px;color:var(--text-muted)">${formatDate(r.created_at)}</td>
         <td style="white-space:nowrap;display:flex;gap:5px;align-items:center">
           ${r.form_url ? `<a href="${esc(r.form_url)}" target="_blank" class="icon-btn icon-btn-link" title="View form">🔗</a>` : ''}
+          <button class="icon-btn icon-btn-edit" onclick="editEnquiry(${r.id},'${esc(r.customer_name||'')}','${esc(r.customer_phone||'')}','${esc(r.customer_email||'')}')" title="Edit" data-hide-readonly>✏️</button>
           <button class="icon-btn icon-btn-del" onclick="deleteEnquiry(${r.id})" title="Delete enquiry" data-hide-readonly>🗑️</button>
         </td>
       </tr>
@@ -457,6 +488,30 @@ async function deleteType(id) {
     loadTypes();
   } catch (err) { toast('Error: ' + err.message, 'error'); }
 }
+
+function editEnquiry(id, name, phone, email) {
+  document.getElementById('edit-enq-id').value    = id;
+  document.getElementById('edit-enq-name').value  = name;
+  document.getElementById('edit-enq-phone').value = phone;
+  document.getElementById('edit-enq-email').value = email;
+  openModal('edit-enquiry-modal');
+}
+
+document.getElementById('save-enq-btn').addEventListener('click', async () => {
+  const id    = document.getElementById('edit-enq-id').value;
+  const phone = document.getElementById('edit-enq-phone').value.trim();
+  if (!phone) { toast('Phone number required', 'warning'); return; }
+  try {
+    await apiPut(`/insurance/enquiries/${id}`, {
+      customer_name:  document.getElementById('edit-enq-name').value.trim(),
+      customer_phone: phone,
+      customer_email: document.getElementById('edit-enq-email').value.trim(),
+    });
+    closeModal('edit-enquiry-modal');
+    toast('✅ Enquiry updated!', 'success');
+    loadEnquiries();
+  } catch (err) { toast('Error: ' + err.message, 'error'); }
+});
 
 async function deleteEnquiry(id) {
   if (!confirm('Delete this enquiry?')) return;

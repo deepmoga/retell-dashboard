@@ -40,35 +40,61 @@ router.get('/public/:userId/types', (req, res) => {
   }
 });
 
-// ── Phone number normalizer ────────────────────────────────────────────────────
-// Fixes common LLM mistakes: spaces, double country code (+9191...), missing +
+// ── Phone number normalizer + validator ───────────────────────────────────────
 function normalizePhone(raw) {
-  if (!raw) return raw;
-  // Strip spaces, dashes, dots, parentheses
-  let p = String(raw).replace(/[\s\-\(\)\.​]/g, '');
+  if (!raw) return { phone: raw, error: null };
+  // Strip spaces, dashes, dots, parentheses, zero-width chars
+  let p = String(raw).replace(/[\s\-\(\)\.​ ]/g, '');
   // Keep only digits and leading +
   p = p.replace(/[^\d+]/g, '');
   // Ensure starts with +
   if (!p.startsWith('+')) p = '+' + p;
-  // Fix double Indian country code: +9191XXXXXXXXXX (13 digits after +) → +91XXXXXXXXXX
-  if (/^\+9191[6-9]\d{9}$/.test(p)) { p = '+91' + p.slice(4); }
-  // Fix: +191XXXXXXXXXX (where 1 crept in before 91) → +91XXXXXXXXXX
-  if (/^\+191[6-9]\d{9}$/.test(p)) { p = '+91' + p.slice(3); }
-  // Fix: digits-only Indian number without + (10 digits starting 6-9) → +91XXXXXXXXXX
-  if (/^\+[6-9]\d{9}$/.test(p)) { p = '+91' + p.slice(1); }
+
+  // ── Common LLM mistakes ──
+  // Double Indian country code: +9191XXXXXXXXXX → +91XXXXXXXXXX
+  if (/^\+9191[6-9]\d{9}$/.test(p)) p = '+91' + p.slice(4);
+  // +191XXXXXXXXXX → +91XXXXXXXXXX
+  if (/^\+191[6-9]\d{9}$/.test(p)) p = '+91' + p.slice(3);
+  // +XXXXXXXXXX (10 digits, no country code) → +91XXXXXXXXXX
+  if (/^\+[6-9]\d{9}$/.test(p)) p = '+91' + p.slice(1);
+
   console.log(`[Insurance] Phone normalized: ${raw} → ${p}`);
-  return p;
+
+  // ── Validate ──
+  // Indian mobile: +91 + exactly 10 digits starting with 6/7/8/9
+  if (p.startsWith('+91')) {
+    const mobile = p.slice(3); // digits after +91
+    if (mobile.length !== 10) {
+      return {
+        phone: p,
+        error: `PHONE NUMBER INCORRECT: "${p}" has ${mobile.length} digits after +91 but Indian mobile numbers have exactly 10 digits. Please say: "I need to correct your phone number — could you please say it again, one digit at a time?"`
+      };
+    }
+    if (!/^[6-9]/.test(mobile)) {
+      return {
+        phone: p,
+        error: `PHONE NUMBER INCORRECT: Indian mobile numbers must start with 6, 7, 8, or 9. Please ask the customer to repeat their number.`
+      };
+    }
+  }
+
+  return { phone: p, error: null };
 }
 
 // sendInsuranceLink — agent calls this after collecting customer info
 router.post('/public/:userId/send-link', async (req, res) => {
   const userId = parseInt(req.params.userId);
   const { customer_name, customer_email, insurance_type, call_id, notes } = req.body;
-  const customer_phone = normalizePhone(req.body.customer_phone);
+  const { phone: customer_phone, error: phoneError } = normalizePhone(req.body.customer_phone);
 
   try {
     if (!customer_phone || !insurance_type) {
       return res.json({ result: 'Missing customer_phone or insurance_type. Please collect these first.' });
+    }
+    // Reject if phone number has wrong digit count — agent must re-collect
+    if (phoneError) {
+      console.warn(`[Insurance] Phone validation failed: ${phoneError}`);
+      return res.json({ result: phoneError });
     }
 
     // Look up insurance type
@@ -208,6 +234,19 @@ router.get('/enquiries', (req, res) => {
     sql += ' ORDER BY created_at DESC';
     const enquiries = db.prepare(sql).all(...params);
     res.json({ enquiries });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Edit enquiry — fix wrong phone/name/email saved by agent
+router.put('/enquiries/:id', readonlyBlock, (req, res) => {
+  try {
+    const userId = getUserId(req);
+    const { customer_name, customer_phone, customer_email } = req.body;
+    const { phone: cleanPhone } = normalizePhone(customer_phone);
+    db.prepare(
+      'UPDATE insurance_enquiries SET customer_name=COALESCE(?,customer_name), customer_phone=COALESCE(?,customer_phone), customer_email=COALESCE(?,customer_email) WHERE id=? AND user_id=?'
+    ).run(customer_name || null, cleanPhone || null, customer_email || null, req.params.id, userId);
+    res.json({ success: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
