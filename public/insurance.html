@@ -289,8 +289,11 @@
       </div>
 
       <div style="background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.3);border-radius:8px;padding:14px;font-size:13px">
-        <div style="font-weight:600;margin-bottom:6px">Suggested Agent System Prompt</div>
-        <div style="color:var(--text-muted)" id="system-prompt-text">Loading...</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div style="font-weight:600">Suggested Agent System Prompt</div>
+          <button onclick="copyPrompt()" class="btn btn-ghost btn-sm" style="font-size:11px;padding:3px 10px">📋 Copy</button>
+        </div>
+        <pre style="white-space:pre-wrap;font-family:inherit;font-size:12px;color:var(--text-muted);margin:0;line-height:1.6" id="system-prompt-text">Loading...</pre>
       </div>
     </div>
     <div class="modal-footer">
@@ -471,6 +474,11 @@ function clearFilters() {
   loadEnquiries();
 }
 
+function copyPrompt() {
+  const text = document.getElementById('system-prompt-text').textContent;
+  navigator.clipboard.writeText(text).then(() => toast('✅ Prompt copied!', 'success')).catch(() => toast('Copy failed', 'error'));
+}
+
 // ── VAPI info modal ───────────────────────────────────────────────────────────
 document.getElementById('vapi-info-btn').addEventListener('click', () => {
   try {
@@ -480,11 +488,26 @@ document.getElementById('vapi-info-btn').addEventListener('click', () => {
     const endpoint = `${base}/api/vapi-tools/${uid}/call`;
     document.getElementById('vapi-endpoint-url').textContent = endpoint;
     document.getElementById('system-prompt-text').textContent =
-      `You are a helpful insurance enquiry assistant for ${user?.company_name || 'our company'}. ` +
-      `When a customer calls:\n1. Greet them warmly\n2. Call getInsuranceTypes to know available products\n` +
-      `3. Ask what type of insurance they need\n4. Collect their full name, phone number, and email\n` +
-      `5. Call sendInsuranceLink with their details and the insurance_type key\n` +
-      `6. Confirm the form link has been sent to their phone\n7. Ask if there is anything else you can help with`;
+      `You are a helpful insurance enquiry assistant for ${user?.company_name || 'our company'}.
+
+When a customer calls:
+1. Greet them warmly
+2. Call getInsuranceTypes tool immediately to know available products
+3. Ask what type of insurance they need
+4. Ask for their full name
+5. Ask for their mobile number WITH country code (e.g. +91 for India, +61 for Australia)
+   - IMPORTANT: Repeat the number back digit by digit to confirm (say each digit separately, NOT as a word like "ninety-one")
+   - Example: "So your number is plus nine one, nine seven eight zero five five one nine zero zero — is that correct?"
+   - Store the number EXACTLY as the customer confirms it — do NOT re-format or change any digits
+6. Ask for their email address (optional — if they don't want to give it, skip it)
+7. Call sendInsuranceLink with: customer_name, customer_phone (with country code, e.g. +919780551900), insurance_type key
+8. Confirm the form link has been sent to their phone
+9. Ask if there is anything else you can help with
+
+PHONE NUMBER RULES:
+- Indian numbers: +91 followed by 10 digits (total 13 chars including +)
+- Do NOT add extra digits or change what the customer said
+- Pass the phone number EXACTLY as confirmed with the customer`;
     openModal('vapi-modal');
   } catch(err) { toast('Error: ' + err.message, 'error'); }
 });

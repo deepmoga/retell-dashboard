@@ -40,10 +40,31 @@ router.get('/public/:userId/types', (req, res) => {
   }
 });
 
+// ── Phone number normalizer ────────────────────────────────────────────────────
+// Fixes common LLM mistakes: spaces, double country code (+9191...), missing +
+function normalizePhone(raw) {
+  if (!raw) return raw;
+  // Strip spaces, dashes, dots, parentheses
+  let p = String(raw).replace(/[\s\-\(\)\.​]/g, '');
+  // Keep only digits and leading +
+  p = p.replace(/[^\d+]/g, '');
+  // Ensure starts with +
+  if (!p.startsWith('+')) p = '+' + p;
+  // Fix double Indian country code: +9191XXXXXXXXXX (13 digits after +) → +91XXXXXXXXXX
+  if (/^\+9191[6-9]\d{9}$/.test(p)) { p = '+91' + p.slice(4); }
+  // Fix: +191XXXXXXXXXX (where 1 crept in before 91) → +91XXXXXXXXXX
+  if (/^\+191[6-9]\d{9}$/.test(p)) { p = '+91' + p.slice(3); }
+  // Fix: digits-only Indian number without + (10 digits starting 6-9) → +91XXXXXXXXXX
+  if (/^\+[6-9]\d{9}$/.test(p)) { p = '+91' + p.slice(1); }
+  console.log(`[Insurance] Phone normalized: ${raw} → ${p}`);
+  return p;
+}
+
 // sendInsuranceLink — agent calls this after collecting customer info
 router.post('/public/:userId/send-link', async (req, res) => {
   const userId = parseInt(req.params.userId);
-  const { customer_name, customer_phone, customer_email, insurance_type, call_id, notes } = req.body;
+  const { customer_name, customer_email, insurance_type, call_id, notes } = req.body;
+  const customer_phone = normalizePhone(req.body.customer_phone);
 
   try {
     if (!customer_phone || !insurance_type) {
