@@ -207,7 +207,7 @@
   </div>
 </div>
 
-<script src="/js/common.js"></script>
+<script src="/js/app.js"></script>
 <script>
 const API = '';
 let currentUserId = null;
@@ -257,7 +257,6 @@ async function loadEnquiries() {
         </td>
       </tr>
     `).join('');
-    applyReadonly();
   } catch (err) {
     document.getElementById('enquiries-tbody').innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--danger)">Error: ${err.message}</td></tr>`;
   }
@@ -297,7 +296,6 @@ async function loadTypes() {
         </td>
       </tr>
     `).join('');
-    applyReadonly();
   } catch (err) {
     document.getElementById('types-tbody').innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--danger)">Error: ${err.message}</td></tr>`;
   }
@@ -378,15 +376,15 @@ function clearFilters() {
 }
 
 // ── VAPI info modal ───────────────────────────────────────────────────────────
-document.getElementById('vapi-info-btn').addEventListener('click', async () => {
+document.getElementById('vapi-info-btn').addEventListener('click', () => {
   try {
-    const profile = await apiGet('/auth/me');
-    const uid = profile.user?.id || '';
+    const user = getUser();
+    const uid = user?.id || '';
     const base = window.location.origin;
     const endpoint = `${base}/api/vapi-tools/${uid}/call`;
     document.getElementById('vapi-endpoint-url').textContent = endpoint;
     document.getElementById('system-prompt-text').textContent =
-      `You are a helpful insurance enquiry assistant for ${profile.user?.company_name || 'our company'}. ` +
+      `You are a helpful insurance enquiry assistant for ${user?.company_name || 'our company'}. ` +
       `When a customer calls:\n1. Greet them warmly\n2. Call getInsuranceTypes to know available products\n` +
       `3. Ask what type of insurance they need\n4. Collect their full name, phone number, and email\n` +
       `5. Call sendInsuranceLink with their details and the insurance_type key\n` +
@@ -417,6 +415,7 @@ function esc(s) {
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
+requireAuth();
 document.getElementById('add-type-btn').addEventListener('click', openAddModal);
 
 (async () => {
