@@ -229,25 +229,25 @@ function handleCheckAvailability(userId, args, res, toolCallId, callId, rawBody)
       }
     }
 
-    // Check slot conflict
-    const existing = db.prepare(`
-      SELECT id FROM appointments
-      WHERE user_id=? AND appointment_date=? AND appointment_time=? AND status != 'cancelled'
-    `).get(userId, date, time);
+    // Check slot capacity
+    const { maxConcurrent } = getMaxConcurrent(userId, date);
+    const slotCounts = getSlotCounts(userId, date);
+    const currentCount = slotCounts[time] || 0;
 
-    if (existing) {
-      const bookedSlots = db.prepare(`
-        SELECT appointment_time FROM appointments
-        WHERE user_id=? AND appointment_date=? AND status != 'cancelled'
-      `).all(userId, date).map(r => r.appointment_time);
-
-      const available = generateSlots(wh).filter(s => !bookedSlots.includes(s)).slice(0, 3).join(', ');
-      const resp = `${dateHint} Slot ${time} on ${formatDate(date)} is already booked. Available slots that day: ${available || 'None — please try another day'}.`;
-      saveLog(userId, 'checkAvailability', args, `ALREADY_BOOKED: ${date} ${time}`, 'already_booked', callId, rawBody, resp);
+    if (currentCount >= maxConcurrent) {
+      const allSlots = generateSlots(wh);
+      const available = allSlots.filter(s => (slotCounts[s] || 0) < maxConcurrent).slice(0, 3).join(', ');
+      const fullMsg = maxConcurrent > 1
+        ? `Slot ${time} on ${formatDate(date)} is full (${currentCount}/${maxConcurrent} bookings).`
+        : `Slot ${time} on ${formatDate(date)} is already booked.`;
+      const resp = `${dateHint} ${fullMsg} Available slots that day: ${available || 'None — please try another day'}.`;
+      saveLog(userId, 'checkAvailability', args, `SLOT_FULL: ${date} ${time} (${currentCount}/${maxConcurrent})`, 'slot_full', callId, rawBody, resp);
       return sendResult(res, toolCallId, resp);
     }
 
-    const resp = `${dateHint} Slot ${time} on ${formatDate(date)} (${date}) is available. You can go ahead and book it.`;
+    const spotsLeft = maxConcurrent - currentCount;
+    const spotsMsg = maxConcurrent > 1 ? ` (${spotsLeft} of ${maxConcurrent} spots still available)` : '';
+    const resp = `${dateHint} Slot ${time} on ${formatDate(date)} (${date}) is available${spotsMsg}. You can go ahead and book it.`;
     saveLog(userId, 'checkAvailability', args, `AVAILABLE: ${date} ${time}`, 'available', callId, rawBody, resp);
     return sendResult(res, toolCallId, resp);
 
@@ -302,15 +302,19 @@ function handleBookAppointment(userId, args, res, toolCallId, callId, rawBody) {
       }
     }
 
-    // Check slot conflict
-    const existing = db.prepare(`
-      SELECT id FROM appointments
-      WHERE user_id=? AND appointment_date=? AND appointment_time=? AND status != 'cancelled'
-    `).get(userId, date, time);
+    // Check slot capacity
+    const { wh: whBook, maxConcurrent: maxConc } = getMaxConcurrent(userId, date);
+    const slotCountsBook = getSlotCounts(userId, date);
+    const currentCountBook = slotCountsBook[time] || 0;
 
-    if (existing) {
-      const resp = `Slot ${time} on ${date} is already booked. Please choose another time.`;
-      saveLog(userId, 'bookAppointment', args, `CONFLICT: ${date} ${time}`, 'conflict', callId, rawBody, resp);
+    if (currentCountBook >= maxConc) {
+      const allSlots = generateSlots(whBook);
+      const nextSlot = allSlots.find(s => (slotCountsBook[s] || 0) < maxConc);
+      const fullMsg = maxConc > 1
+        ? `Slot ${time} on ${date} is full (${currentCountBook}/${maxConc} bookings).`
+        : `Slot ${time} on ${date} is already booked.`;
+      const resp = `${fullMsg} ${nextSlot ? `Next available time today: ${nextSlot}. Please confirm with the customer.` : 'No more slots available today — please ask the customer for another day.'}`;
+      saveLog(userId, 'bookAppointment', args, `SLOT_FULL: ${date} ${time} (${currentCountBook}/${maxConc})`, 'slot_full', callId, rawBody, resp);
       return sendResult(res, toolCallId, resp);
     }
 
@@ -352,6 +356,19 @@ function formatDate(dateStr) {
       weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
     });
   } catch(_) { return dateStr; }
+}
+
+function getMaxConcurrent(userId, dateStr) {
+  const dow = new Date(dateStr + 'T00:00:00').getDay();
+  const wh = db.prepare(`SELECT * FROM working_hours WHERE user_id=? AND day_of_week=?`).get(userId, dow);
+  return { wh, maxConcurrent: wh?.max_concurrent_bookings || 1 };
+}
+
+function getSlotCounts(userId, dateStr) {
+  const counts = {};
+  db.prepare(`SELECT appointment_time, COUNT(*) as c FROM appointments WHERE user_id=? AND appointment_date=? AND status != 'cancelled' GROUP BY appointment_time`)
+    .all(userId, dateStr).forEach(r => { counts[r.appointment_time] = r.c; });
+  return counts;
 }
 
 function generateSlots(wh) {

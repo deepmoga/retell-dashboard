@@ -38,10 +38,12 @@ function getAvailableSlots(userId, dateStr, daysAhead = 14) {
     if (!h || !h.is_open) continue;
 
     const dateKey = d.toISOString().slice(0, 10);
-    // Get already booked slots for this day
-    const booked = db.prepare(
-      "SELECT appointment_time FROM appointments WHERE user_id=? AND appointment_date=? AND status != 'cancelled'"
-    ).all(userId, dateKey).map(r => r.appointment_time);
+    const maxConcurrent = h.max_concurrent_bookings || 1;
+    // Count bookings per slot for this day
+    const bookedCounts = {};
+    db.prepare(
+      "SELECT appointment_time, COUNT(*) as c FROM appointments WHERE user_id=? AND appointment_date=? AND status != 'cancelled' GROUP BY appointment_time"
+    ).all(userId, dateKey).forEach(r => { bookedCounts[r.appointment_time] = r.c; });
 
     const [sh, sm] = h.start_time.split(':').map(Number);
     const [eh, em] = h.end_time.split(':').map(Number);
@@ -61,7 +63,7 @@ function getAvailableSlots(userId, dateStr, daysAhead = 14) {
         if (slotTime <= now) continue;
       }
 
-      if (!booked.includes(timeStr)) {
+      if ((bookedCounts[timeStr] || 0) < maxConcurrent) {
         slots.push({ date: dateKey, time: timeStr });
         if (slots.length >= 20) break;
       }
@@ -98,17 +100,20 @@ router.post('/public/:userId/book', async (req, res) => {
 
     if (!date || !time) return res.status(400).json({ error: 'date and time required' });
 
-    // Double-check slot is still available
-    const existing = db.prepare(
-      "SELECT id FROM appointments WHERE user_id=? AND appointment_date=? AND appointment_time=? AND status != 'cancelled'"
-    ).get(userId, date, time);
+    // Double-check slot capacity
+    const dow = new Date(date + 'T00:00:00').getDay();
+    const wh = db.prepare(`SELECT * FROM working_hours WHERE user_id=? AND day_of_week=?`).get(userId, dow);
+    const maxConcurrent = wh?.max_concurrent_bookings || 1;
+    const bookedCount = db.prepare(
+      "SELECT COUNT(*) as c FROM appointments WHERE user_id=? AND appointment_date=? AND appointment_time=? AND status != 'cancelled'"
+    ).get(userId, date, time).c;
 
-    if (existing) {
+    if (bookedCount >= maxConcurrent) {
       const slots = getAvailableSlots(userId, null, 7);
       return res.status(409).json({
-        error: 'Slot already taken',
+        error: 'Slot full',
         next_available: slots[0] || null,
-        message: slots[0] ? `That time is taken. Next available: ${slots[0].date} at ${slots[0].time}` : 'No slots available',
+        message: slots[0] ? `That time is full (${bookedCount}/${maxConcurrent}). Next available: ${slots[0].date} at ${slots[0].time}` : 'No slots available',
       });
     }
 
@@ -233,10 +238,10 @@ router.post('/working-hours', (req, res) => {
 
     // Delete old and insert new
     db.prepare('DELETE FROM working_hours WHERE user_id=?').run(userId);
-    const insert = db.prepare(`INSERT INTO working_hours (user_id, day_of_week, is_open, start_time, end_time, slot_duration)
-      VALUES (@uid, @dow, @open, @start, @end, @dur)`);
+    const insert = db.prepare(`INSERT INTO working_hours (user_id, day_of_week, is_open, start_time, end_time, slot_duration, max_concurrent_bookings)
+      VALUES (@uid, @dow, @open, @start, @end, @dur, @mc)`);
     for (const h of working_hours) {
-      insert.run({ uid: userId, dow: h.day_of_week, open: h.is_open ? 1 : 0, start: h.start_time, end: h.end_time, dur: h.slot_duration || 30 });
+      insert.run({ uid: userId, dow: h.day_of_week, open: h.is_open ? 1 : 0, start: h.start_time, end: h.end_time, dur: h.slot_duration || 30, mc: h.max_concurrent_bookings || 1 });
     }
     res.json({ success: true, message: 'Working hours saved' });
   } catch (err) { res.status(500).json({ error: err.message }); }
