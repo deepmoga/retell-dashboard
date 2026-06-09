@@ -170,6 +170,7 @@
           <th style="text-align:left;padding:8px;color:var(--text-muted);font-size:12px">Start</th>
           <th style="text-align:left;padding:8px;color:var(--text-muted);font-size:12px">End</th>
           <th style="text-align:left;padding:8px;color:var(--text-muted);font-size:12px">Slot (min)</th>
+          <th style="text-align:left;padding:8px;color:var(--text-muted);font-size:12px">Max Bookings/Slot</th>
         </tr></thead>
         <tbody id="hours-tbody"></tbody>
       </table>
@@ -584,7 +585,7 @@ function bindEvents() {
     const hours = data.working_hours;
     const tbody = document.getElementById('hours-tbody');
     tbody.innerHTML = DAYS.map((day, i) => {
-      const h = hours.find(x => x.day_of_week === i) || { day_of_week: i, is_open: i >= 1 && i <= 5 ? 1 : 0, start_time: '09:00', end_time: '17:00', slot_duration: 30 };
+      const h = hours.find(x => x.day_of_week === i) || { day_of_week: i, is_open: i >= 1 && i <= 5 ? 1 : 0, start_time: '09:00', end_time: '17:00', slot_duration: 30, max_concurrent_bookings: 1 };
       return `<tr>
         <td style="padding:8px;font-size:13px;font-weight:500">${day}</td>
         <td style="padding:8px"><label style="display:flex;align-items:center;gap:6px;cursor:pointer">
@@ -593,6 +594,7 @@ function bindEvents() {
         <td style="padding:8px"><input type="time" id="h-start-${i}" value="${h.start_time}" class="form-control" style="width:110px" ${!h.is_open ? 'disabled' : ''}></td>
         <td style="padding:8px"><input type="time" id="h-end-${i}" value="${h.end_time}" class="form-control" style="width:110px" ${!h.is_open ? 'disabled' : ''}></td>
         <td style="padding:8px"><input type="number" id="h-slot-${i}" value="${h.slot_duration || 30}" class="form-control" style="width:70px" min="15" step="15" ${!h.is_open ? 'disabled' : ''}></td>
+        <td style="padding:8px"><input type="number" id="h-mc-${i}" value="${h.max_concurrent_bookings || 1}" class="form-control" style="width:70px" min="1" max="50" ${!h.is_open ? 'disabled' : ''}></td>
       </tr>`;
     }).join('');
     openModal('hours-modal');
@@ -605,6 +607,7 @@ function bindEvents() {
       start_time: document.getElementById(`h-start-${i}`).value,
       end_time: document.getElementById(`h-end-${i}`).value,
       slot_duration: parseInt(document.getElementById(`h-slot-${i}`).value) || 30,
+      max_concurrent_bookings: parseInt(document.getElementById(`h-mc-${i}`).value) || 1,
     }));
     try {
       await apiPost('/appointments/working-hours', { working_hours: hours });
@@ -652,7 +655,7 @@ function bindEvents() {
 
 function toggleDay(i) {
   const isOpen = document.getElementById(`h-open-${i}`).checked;
-  ['start','end','slot'].forEach(f => {
+  ['start','end','slot','mc'].forEach(f => {
     const el = document.getElementById(`h-${f}-${i}`);
     if (el) el.disabled = !isOpen;
   });
