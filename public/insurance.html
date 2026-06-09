@@ -5,6 +5,95 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Insurance — VoiceAgent</title>
   <link rel="stylesheet" href="/css/style.css">
+  <style>
+    /* ── Insurance page: tab pills ── */
+    .ins-tabs {
+      display: flex;
+      gap: 0;
+      margin-bottom: 24px;
+      background: var(--surface2);
+      border-radius: 10px;
+      padding: 4px;
+      width: fit-content;
+    }
+    .ins-tab-btn {
+      padding: 8px 22px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      border-radius: 7px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .ins-tab-btn:hover { color: var(--text); }
+    .ins-tab-btn.active {
+      background: var(--surface);
+      color: var(--accent);
+      font-weight: 700;
+      box-shadow: 0 2px 6px rgba(0,0,0,.35);
+    }
+
+    /* ── SMS status pill badges ── */
+    .sms-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.2px;
+    }
+    .sms-pill.sent      { background: rgba(0,212,170,.12);  color: #00d4aa; border: 1px solid rgba(0,212,170,.3); }
+    .sms-pill.failed    { background: rgba(239,68,68,.12);  color: #ef4444; border: 1px solid rgba(239,68,68,.3); }
+    .sms-pill.no-twilio { background: rgba(245,158,11,.12); color: #f59e0b; border: 1px solid rgba(245,158,11,.3); }
+    .sms-pill.pending   { background: rgba(148,163,184,.08); color: var(--text-muted); border: 1px solid var(--border); }
+
+    /* ── Insurance type color pill ── */
+    .ins-type-pill {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    /* ── Active / Inactive badge ── */
+    .status-pill-active   { display:inline-block; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600; background:rgba(0,212,170,.1); color:#00d4aa; border:1px solid rgba(0,212,170,.25); }
+    .status-pill-inactive { display:inline-block; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600; background:rgba(148,163,184,.08); color:var(--text-muted); border:1px solid var(--border); }
+
+    /* ── Small icon action buttons ── */
+    .icon-btn {
+      width: 30px; height: 30px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      background: var(--surface2);
+      cursor: pointer;
+      font-size: 13px;
+      display: inline-flex; align-items: center; justify-content: center;
+      transition: all 0.15s;
+      text-decoration: none;
+      color: var(--text);
+    }
+    .icon-btn:hover          { background: var(--surface3); border-color: var(--accent); transform: scale(1.08); }
+    .icon-btn.icon-btn-edit:hover { border-color: #60a5fa; }
+    .icon-btn.icon-btn-del:hover  { background: rgba(239,68,68,.12); border-color: #ef4444; }
+    .icon-btn.icon-btn-link:hover { background: rgba(0,212,170,.1); border-color: var(--accent); }
+
+    /* ── Type key code chip ── */
+    .type-key-chip {
+      background: rgba(99,102,241,.12);
+      color: #a5b4fc;
+      border: 1px solid rgba(99,102,241,.25);
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-family: monospace;
+      letter-spacing: 0.3px;
+    }
+  </style>
 </head>
 <body>
 <div class="app-layout">
@@ -45,9 +134,11 @@
         <div class="page-title">🛡️ Insurance</div>
         <div class="page-sub">Manage insurance types, form links & enquiries from AI calls</div>
       </div>
-      <div style="display:flex;gap:10px">
-        <button class="btn btn-secondary" id="vapi-info-btn">🤖 VAPI Setup</button>
-        <button class="btn btn-primary" id="add-type-btn" data-hide-readonly>+ Add Insurance Type</button>
+      <div style="display:flex;gap:10px;align-items:center">
+        <button class="btn btn-secondary" id="vapi-info-btn" style="display:flex;align-items:center;gap:7px">🤖 VAPI Setup</button>
+        <button class="btn btn-primary" id="add-type-btn" data-hide-readonly style="display:flex;align-items:center;gap:7px">
+          <span style="font-size:18px;line-height:1">+</span> Add Insurance Type
+        </button>
       </div>
     </div>
 
@@ -68,20 +159,21 @@
     </div>
 
     <!-- Tabs -->
-    <div style="display:flex;gap:4px;margin-bottom:20px;border-bottom:1px solid var(--border)">
-      <button class="tab-btn active" data-tab="enquiries" onclick="switchTab('enquiries')">📋 Enquiries</button>
-      <button class="tab-btn" data-tab="types" onclick="switchTab('types')">🗂️ Insurance Types</button>
+    <div class="ins-tabs">
+      <button class="ins-tab-btn active" data-tab="enquiries" onclick="switchTab('enquiries')">📋 Enquiries</button>
+      <button class="ins-tab-btn" data-tab="types" onclick="switchTab('types')">🗂️ Insurance Types</button>
     </div>
 
     <!-- Enquiries Tab -->
     <div id="tab-enquiries">
-      <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
-        <select id="filter-type" class="form-control" style="width:180px" onchange="loadEnquiries()">
+      <div style="display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap;align-items:center;padding:12px 14px;background:var(--surface2);border-radius:10px;border:1px solid var(--border)">
+        <span style="font-size:12px;color:var(--text-muted);font-weight:600;margin-right:4px">🔍 Filter:</span>
+        <select id="filter-type" class="form-control" style="width:180px;flex-shrink:0" onchange="loadEnquiries()">
           <option value="all">All Types</option>
         </select>
-        <input type="date" id="filter-from" class="form-control" style="width:150px" onchange="loadEnquiries()">
-        <input type="date" id="filter-to" class="form-control" style="width:150px" onchange="loadEnquiries()">
-        <button class="btn btn-ghost btn-sm" onclick="clearFilters()">Clear</button>
+        <input type="date" id="filter-from" class="form-control" style="width:148px;flex-shrink:0" onchange="loadEnquiries()" placeholder="From date">
+        <input type="date" id="filter-to" class="form-control" style="width:148px;flex-shrink:0" onchange="loadEnquiries()" placeholder="To date">
+        <button class="btn btn-ghost btn-sm" onclick="clearFilters()" style="margin-left:auto">✕ Clear</button>
       </div>
       <div class="table-container">
         <table class="table">
@@ -213,7 +305,7 @@ const API = '';
 let currentUserId = null;
 
 function switchTab(tab) {
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('.ins-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   document.getElementById('tab-enquiries').style.display = tab === 'enquiries' ? '' : 'none';
   document.getElementById('tab-types').style.display     = tab === 'types'     ? '' : 'none';
   if (tab === 'types') loadTypes();
@@ -244,16 +336,16 @@ async function loadEnquiries() {
 
     tbody.innerHTML = rows.map(r => `
       <tr>
-        <td style="color:var(--text-muted);font-size:12px">#${r.id}</td>
-        <td style="font-weight:500">${esc(r.customer_name || '—')}</td>
-        <td>${esc(r.customer_phone || '—')}</td>
-        <td style="font-size:12px">${esc(r.customer_email || '—')}</td>
-        <td><span style="background:var(--surface2);padding:2px 8px;border-radius:10px;font-size:12px">${esc(r.insurance_label || r.insurance_type)}</span></td>
+        <td style="color:var(--text-muted);font-size:11px;font-weight:600">#${r.id}</td>
+        <td style="font-weight:600">${esc(r.customer_name || '—')}</td>
+        <td style="font-size:13px;font-family:monospace">${esc(r.customer_phone || '—')}</td>
+        <td style="font-size:12px;color:var(--text-muted)">${esc(r.customer_email || '—')}</td>
+        <td><span class="ins-type-pill" style="${typePillStyle(r.insurance_label || r.insurance_type)}">${esc(r.insurance_label || r.insurance_type)}</span></td>
         <td>${smsBadge(r.sms_status)}</td>
         <td style="font-size:12px;color:var(--text-muted)">${formatDate(r.created_at)}</td>
-        <td>
-          ${r.form_url ? `<a href="${esc(r.form_url)}" target="_blank" class="btn btn-ghost btn-sm" title="View form">🔗</a>` : ''}
-          <button class="btn btn-ghost btn-sm" onclick="deleteEnquiry(${r.id})" title="Delete" data-hide-readonly>🗑️</button>
+        <td style="white-space:nowrap;display:flex;gap:5px;align-items:center">
+          ${r.form_url ? `<a href="${esc(r.form_url)}" target="_blank" class="icon-btn icon-btn-link" title="View form">🔗</a>` : ''}
+          <button class="icon-btn icon-btn-del" onclick="deleteEnquiry(${r.id})" title="Delete enquiry" data-hide-readonly>🗑️</button>
         </td>
       </tr>
     `).join('');
@@ -283,16 +375,20 @@ async function loadTypes() {
 
     tbody.innerHTML = types.map(t => `
       <tr>
-        <td style="font-weight:600">${esc(t.label)}</td>
-        <td><code style="background:var(--surface2);padding:2px 6px;border-radius:4px;font-size:12px">${esc(t.type_key)}</code></td>
-        <td style="font-size:12px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-          <a href="${esc(t.form_url)}" target="_blank" style="color:var(--accent)">${esc(t.form_url)}</a>
+        <td>
+          <span class="ins-type-pill" style="${typePillStyle(t.label)}">${esc(t.label)}</span>
         </td>
-        <td style="font-size:12px;color:var(--text-muted)">${esc(t.description || '—')}</td>
-        <td><span style="color:${t.is_active ? 'var(--accent)' : 'var(--text-muted)'};">${t.is_active ? '● Active' : '○ Inactive'}</span></td>
-        <td data-hide-readonly>
-          <button class="btn btn-ghost btn-sm" onclick="editType(${JSON.stringify(t).replace(/"/g,'&quot;')})">✏️</button>
-          <button class="btn btn-ghost btn-sm" onclick="deleteType(${t.id})">🗑️</button>
+        <td><span class="type-key-chip">${esc(t.type_key)}</span></td>
+        <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+          <a href="${esc(t.form_url)}" target="_blank" style="color:var(--accent);font-size:12px;display:inline-flex;align-items:center;gap:4px" title="${esc(t.form_url)}">
+            🔗 <span style="text-decoration:underline;text-underline-offset:2px">${esc(t.form_url.replace(/^https?:\/\//,'').replace(/\/.*$/,''))}</span>
+          </a>
+        </td>
+        <td style="font-size:12px;color:var(--text-muted);max-width:200px">${esc(t.description || '—')}</td>
+        <td><span class="${t.is_active ? 'status-pill-active' : 'status-pill-inactive'}">${t.is_active ? '● Active' : '○ Inactive'}</span></td>
+        <td data-hide-readonly style="white-space:nowrap;display:flex;gap:5px;align-items:center">
+          <button class="icon-btn icon-btn-edit" onclick="editType(${JSON.stringify(t).replace(/"/g,'&quot;')})">✏️</button>
+          <button class="icon-btn icon-btn-del" onclick="deleteType(${t.id})">🗑️</button>
         </td>
       </tr>
     `).join('');
@@ -396,13 +492,30 @@ document.getElementById('vapi-info-btn').addEventListener('click', () => {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function smsBadge(status) {
   const map = {
-    sent:      ['var(--accent)', '✓ Sent'],
-    failed:    ['var(--danger)', '✗ Failed'],
-    no_twilio: ['#f59e0b',       '⚠ No Twilio'],
-    pending:   ['var(--text-muted)', '… Pending'],
+    sent:      ['sent',       '✓ SMS Sent'],
+    failed:    ['failed',     '✗ Failed'],
+    no_twilio: ['no-twilio',  '⚠ No Twilio'],
+    pending:   ['pending',    '… Pending'],
   };
-  const [color, label] = map[status] || ['var(--text-muted)', status];
-  return `<span style="color:${color};font-size:12px;font-weight:600">${label}</span>`;
+  const [cls, label] = map[status] || ['pending', status];
+  return `<span class="sms-pill ${cls}">${label}</span>`;
+}
+
+const TYPE_PILL_COLORS = [
+  ['rgba(99,102,241,.15)',  '#a5b4fc'],
+  ['rgba(245,158,11,.12)',  '#fbbf24'],
+  ['rgba(0,212,170,.12)',   '#00d4aa'],
+  ['rgba(239,68,68,.12)',   '#f87171'],
+  ['rgba(59,130,246,.12)',  '#60a5fa'],
+  ['rgba(168,85,247,.12)',  '#c084fc'],
+  ['rgba(236,72,153,.12)',  '#f472b6'],
+  ['rgba(20,184,166,.12)',  '#2dd4bf'],
+];
+function typePillStyle(label) {
+  let h = 0;
+  for (const c of String(label || '')) h = (h * 31 + c.charCodeAt(0)) & 0xffff;
+  const [bg, fg] = TYPE_PILL_COLORS[h % TYPE_PILL_COLORS.length];
+  return `background:${bg};color:${fg};border:1px solid ${fg}40`;
 }
 
 function formatDate(dt) {
