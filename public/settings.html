@@ -85,13 +85,23 @@
               <span id="vapi-status" style="font-size:11px;padding:2px 8px;border-radius:10px;background:var(--surface2);color:var(--text-muted)">Not set</span>
             </div>
             <div class="form-group">
-              <label class="form-label">VAPI API Key</label>
+              <label class="form-label">VAPI Private API Key</label>
               <div style="display:flex;gap:8px">
                 <input type="password" id="vapi-api-key" class="form-control" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
                 <button class="btn btn-ghost btn-sm" onclick="toggleVisible('vapi-api-key')">👁</button>
               </div>
               <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
-                dashboard.vapi.ai → Account → API Keys → Copy
+                dashboard.vapi.ai → Account → API Keys → "Private Key" → Copy
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">VAPI Public Key <span style="color:var(--text-muted);font-size:11px">(for browser test calls)</span></label>
+              <div style="display:flex;gap:8px">
+                <input type="password" id="vapi-public-key" class="form-control" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+                <button class="btn btn-ghost btn-sm" onclick="toggleVisible('vapi-public-key')">👁</button>
+              </div>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
+                dashboard.vapi.ai → Account → API Keys → "Public Key" → Copy. Needed for "🎙️ Test Call" on Agent Builder page.
               </div>
             </div>
           </div>
@@ -306,6 +316,9 @@ async function loadProfile() {
       document.getElementById('vapi-api-key').value = u.vapi_api_key;
       setStatus('vapi-status', '✓ Set', 'var(--accent)');
     }
+    if (u.vapi_public_key) {
+      document.getElementById('vapi-public-key').value = u.vapi_public_key;
+    }
     if (u.twilio_account_sid) {
       document.getElementById('twilio-sid').value = u.twilio_account_sid;
       setStatus('twilio-status', '✓ Set', 'var(--accent)');
@@ -401,6 +414,7 @@ function bindEvents() {
       await apiPut('/auth/profile', {
         retell_api_key: retell,
         vapi_api_key: vapi,
+        vapi_public_key: document.getElementById('vapi-public-key').value.trim(),
         twilio_account_sid: sid,
         twilio_auth_token: token,
         twilio_phone_number: document.getElementById('twilio-phone').value.trim(),

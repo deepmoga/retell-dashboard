@@ -63,7 +63,7 @@ router.get('/me', authMiddleware, (req, res) => {
 // Update own profile + API keys — saves to DB directly
 router.put('/profile', authMiddleware, async (req, res) => {
   try {
-    const { name, company_name, retell_api_key, vapi_api_key, twilio_account_sid, twilio_auth_token, twilio_phone_number, timezone, current_password, new_password } = req.body;
+    const { name, company_name, retell_api_key, vapi_api_key, vapi_public_key, twilio_account_sid, twilio_auth_token, twilio_phone_number, timezone, current_password, new_password } = req.body;
     const { db } = require('../database/db');
 
     const user = db.prepare('SELECT * FROM users WHERE id=?').get(req.user.userId);
@@ -76,6 +76,7 @@ router.put('/profile', authMiddleware, async (req, res) => {
         company_name = COALESCE(@company_name, company_name),
         retell_api_key = @retell_api_key,
         vapi_api_key = @vapi_api_key,
+        vapi_public_key = @vapi_public_key,
         twilio_account_sid = @twilio_account_sid,
         twilio_auth_token = @twilio_auth_token,
         twilio_phone_number = @twilio_phone_number,
@@ -86,6 +87,7 @@ router.put('/profile', authMiddleware, async (req, res) => {
       company_name: company_name || user.company_name,
       retell_api_key: retell_api_key ?? user.retell_api_key ?? '',
       vapi_api_key: vapi_api_key ?? user.vapi_api_key ?? '',
+      vapi_public_key: vapi_public_key || user.vapi_public_key || '',
       twilio_account_sid: twilio_account_sid ?? user.twilio_account_sid ?? '',
       twilio_auth_token: twilio_auth_token ?? user.twilio_auth_token ?? '',
       twilio_phone_number: twilio_phone_number || user.twilio_phone_number || '',

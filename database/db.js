@@ -176,6 +176,7 @@ try { db.exec(`ALTER TABLE users ADD COLUMN google_calendar_id TEXT DEFAULT 'pri
 try { db.exec(`ALTER TABLE appointments ADD COLUMN google_event_id TEXT`); } catch(e) {}
 try { db.exec(`ALTER TABLE working_hours ADD COLUMN max_concurrent_bookings INTEGER DEFAULT 1`); } catch(e) {}
 try { db.exec(`ALTER TABLE users ADD COLUMN twilio_phone_number TEXT`); } catch(e) {}
+try { db.exec(`ALTER TABLE users ADD COLUMN vapi_public_key TEXT`); } catch(e) {}
 try {
   db.exec(`CREATE TABLE IF NOT EXISTS insurance_types (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -255,7 +256,7 @@ function seedAdmin() {
 // --- User queries ---
 const userQueries = {
   findByEmail: db.prepare('SELECT * FROM users WHERE email = ?'),
-  findById: db.prepare('SELECT id, name, email, role, company_name, logo_url, retell_api_key, vapi_api_key, twilio_account_sid, twilio_auth_token, twilio_phone_number, timezone, plan_id, plan_start_date, plan_expiry_date, is_readonly, created_at FROM users WHERE id = ?'),
+  findById: db.prepare('SELECT id, name, email, role, company_name, logo_url, retell_api_key, vapi_api_key, vapi_public_key, twilio_account_sid, twilio_auth_token, twilio_phone_number, timezone, plan_id, plan_start_date, plan_expiry_date, is_readonly, created_at FROM users WHERE id = ?'),
   findAll: db.prepare('SELECT id, name, email, role, company_name, plan_id, plan_start_date, plan_expiry_date, is_readonly, created_at FROM users ORDER BY created_at DESC'),
   create: db.prepare(`
     INSERT INTO users (name, email, password, role, company_name, retell_api_key, twilio_account_sid, twilio_auth_token)

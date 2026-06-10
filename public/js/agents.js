@@ -177,6 +177,7 @@ function renderAgents(agents) {
           : '<div class="agent-prompt-preview" style="color:var(--text-dim)">No system prompt configured</div>'}
         <div class="agent-card-actions">
           <button class="btn btn-secondary btn-sm" style="flex:1" onclick="openEditAgentModal('${escHtml(a.id)}')">✏️ Edit</button>
+          <button class="btn btn-secondary btn-sm" style="flex:1" onclick="openTestCallModal('${escHtml(a.id)}','${escHtml(a.name || 'Agent')}')">🎙️ Test</button>
           <button class="btn btn-danger btn-sm" onclick="openDeleteModal('${escHtml(a.id)}','${escHtml(a.name || 'this agent')}')">🗑</button>
         </div>
       </div>`;
@@ -362,3 +363,122 @@ function insertTemplate(type) {
   const ta = document.getElementById('f-system-prompt');
   if (ta) { ta.value = TEMPLATES[type] || ''; ta.focus(); toast('Template inserted', 'success'); }
 }
+
+// ── 🎙️ Test Call (VAPI Web SDK — talk to agent via browser mic) ─────────────────
+let vapiClient = null;
+let testCallActive = false;
+
+async function openTestCallModal(agentId, agentName) {
+  document.getElementById('test-call-agent-name').textContent = agentName;
+  document.getElementById('test-call-status').textContent = 'Click Start to talk to your agent via browser microphone';
+  document.getElementById('test-call-orb').style.cssText = 'width:90px;height:90px;border-radius:50%;background:var(--surface2);border:3px solid var(--border);margin:0 auto 20px;display:flex;align-items:center;justify-content:center;font-size:36px;transition:all .3s';
+  document.getElementById('test-call-orb').textContent = '🎙️';
+  document.getElementById('test-call-start-btn').style.display = '';
+  document.getElementById('test-call-end-btn').style.display = 'none';
+  document.getElementById('test-call-transcript').style.display = 'none';
+  document.getElementById('test-call-transcript').innerHTML = '';
+  document.getElementById('test-call-no-key').style.display = 'none';
+
+  // Check public key is set
+  let publicKey = null;
+  try {
+    const data = await apiGet('/auth/me');
+    publicKey = data.user?.vapi_public_key;
+  } catch (e) {}
+
+  if (!publicKey) {
+    document.getElementById('test-call-no-key').style.display = 'block';
+    document.getElementById('test-call-start-btn').disabled = true;
+  } else {
+    document.getElementById('test-call-start-btn').disabled = false;
+  }
+
+  document.getElementById('test-call-start-btn').onclick = () => startTestCall(agentId, publicKey);
+  document.getElementById('test-call-end-btn').onclick = endTestCall;
+
+  openModal('test-call-modal');
+}
+
+function startTestCall(agentId, publicKey) {
+  if (typeof Vapi === 'undefined') {
+    toast('VAPI Web SDK failed to load. Check internet connection.', 'error');
+    return;
+  }
+  if (!publicKey) {
+    toast('VAPI Public Key not set in Settings', 'warning');
+    return;
+  }
+
+  try {
+    vapiClient = new Vapi(publicKey);
+
+    const statusEl = document.getElementById('test-call-status');
+    const orbEl = document.getElementById('test-call-orb');
+    const transcriptEl = document.getElementById('test-call-transcript');
+
+    vapiClient.on('call-start', () => {
+      testCallActive = true;
+      statusEl.textContent = '🟢 Call connected — speak now';
+      orbEl.style.borderColor = 'var(--accent)';
+      orbEl.style.boxShadow = '0 0 0 6px rgba(0,212,170,.15)';
+      document.getElementById('test-call-start-btn').style.display = 'none';
+      document.getElementById('test-call-end-btn').style.display = '';
+      transcriptEl.style.display = 'block';
+    });
+
+    vapiClient.on('call-end', () => {
+      testCallActive = false;
+      statusEl.textContent = '⏹ Call ended';
+      orbEl.style.borderColor = 'var(--border)';
+      orbEl.style.boxShadow = 'none';
+      orbEl.textContent = '🎙️';
+      document.getElementById('test-call-start-btn').style.display = '';
+      document.getElementById('test-call-end-btn').style.display = 'none';
+    });
+
+    vapiClient.on('speech-start', () => { orbEl.textContent = '🔊'; });
+    vapiClient.on('speech-end',   () => { orbEl.textContent = '🎙️'; });
+
+    vapiClient.on('message', (msg) => {
+      if (msg.type === 'transcript' && msg.transcriptType === 'final') {
+        const who = msg.role === 'user' ? '🧑 You' : '🤖 Agent';
+        const div = document.createElement('div');
+        div.style.marginBottom = '6px';
+        div.innerHTML = `<strong style="color:${msg.role === 'user' ? 'var(--accent)' : '#a5b4fc'}">${who}:</strong> ${escHtml(msg.transcript)}`;
+        transcriptEl.appendChild(div);
+        transcriptEl.scrollTop = transcriptEl.scrollHeight;
+      }
+    });
+
+    vapiClient.on('error', (err) => {
+      console.error('[VAPI Test Call]', err);
+      toast('Call error: ' + (err?.message || 'Unknown error'), 'error');
+      statusEl.textContent = '❌ Error: ' + (err?.message || 'Unknown error');
+    });
+
+    statusEl.textContent = '🔄 Connecting... (allow microphone access)';
+    vapiClient.start(agentId);
+  } catch (err) {
+    toast('Failed to start call: ' + err.message, 'error');
+  }
+}
+
+function endTestCall() {
+  if (vapiClient && testCallActive) {
+    try { vapiClient.stop(); } catch (e) {}
+  }
+  vapiClient = null;
+  testCallActive = false;
+  closeModal('test-call-modal');
+}
+
+// Make sure call ends if modal is closed via overlay click or X button
+document.getElementById('test-call-modal')?.addEventListener('click', (e) => {
+  if (e.target.classList.contains('modal-overlay') || e.target.classList.contains('modal-close')) {
+    if (vapiClient && testCallActive) {
+      try { vapiClient.stop(); } catch (err) {}
+      vapiClient = null;
+      testCallActive = false;
+    }
+  }
+});

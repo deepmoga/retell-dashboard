@@ -367,6 +367,31 @@
   </div>
 </div>
 
+<!-- Test Call Modal -->
+<div class="modal-overlay" id="test-call-modal">
+  <div class="modal-box" style="max-width:420px;text-align:center">
+    <div class="modal-header">
+      <div class="modal-title">🎙️ Test Call — <span id="test-call-agent-name"></span></div>
+      <button class="modal-close" onclick="endTestCall()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="test-call-status" style="font-size:13px;color:var(--text-muted);margin-bottom:16px">Click Start to talk to your agent via browser microphone</div>
+
+      <div id="test-call-orb" style="width:90px;height:90px;border-radius:50%;background:var(--surface2);border:3px solid var(--border);margin:0 auto 20px;display:flex;align-items:center;justify-content:center;font-size:36px;transition:all .3s">🎙️</div>
+
+      <button class="btn btn-primary" id="test-call-start-btn" style="width:100%;margin-bottom:8px">▶ Start Call</button>
+      <button class="btn btn-danger" id="test-call-end-btn" style="width:100%;display:none">⏹ End Call</button>
+
+      <div id="test-call-transcript" style="margin-top:16px;max-height:220px;overflow-y:auto;text-align:left;font-size:12px;background:var(--surface2);border-radius:8px;padding:10px;display:none"></div>
+
+      <div id="test-call-no-key" style="display:none;margin-top:14px;padding:12px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:8px;font-size:12px;color:#f59e0b;text-align:left">
+        ⚠️ VAPI Public Key not set. Go to <a href="/settings" style="color:#f59e0b;text-decoration:underline">Settings → VAPI</a> and add your Public Key (dashboard.vapi.ai → API Keys → Public Key).
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@vapi-ai/web@latest/dist/index.js"></script>
 <script src="/js/app.js"></script>
 <script src="/js/agents.js"></script>
 </body>
