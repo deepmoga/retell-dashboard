@@ -391,7 +391,12 @@
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@vapi-ai/web@latest/dist/index.js"></script>
+<style>
+/* Hide the floating widget button auto-created by VAPI's html-script-tag SDK —
+   we drive calls via our own Test Call modal UI */
+#vapi-support-btn { display: none !important; }
+</style>
+<script src="https://cdn.jsdelivr.net/gh/VapiAI/html-script-tag@latest/dist/assets/index.js"></script>
 <script src="/js/app.js"></script>
 <script src="/js/agents.js"></script>
 </body>

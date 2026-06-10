@@ -400,7 +400,7 @@ async function openTestCallModal(agentId, agentName) {
 }
 
 function startTestCall(agentId, publicKey) {
-  if (typeof Vapi === 'undefined') {
+  if (typeof window.vapiSDK === 'undefined' || typeof window.vapiSDK.run !== 'function') {
     toast('VAPI Web SDK failed to load. Check internet connection.', 'error');
     return;
   }
@@ -410,7 +410,22 @@ function startTestCall(agentId, publicKey) {
   }
 
   try {
-    vapiClient = new Vapi(publicKey);
+    // Remove any leftover widget button from a previous run() call so they don't pile up
+    document.getElementById('vapi-support-btn')?.remove();
+
+    // window.vapiSDK.run() returns the underlying Vapi client instance and also
+    // creates a small floating widget button on the page (hidden via CSS — we
+    // drive the call from our own modal UI instead).
+    vapiClient = window.vapiSDK.run({
+      apiKey: publicKey,
+      assistant: agentId,
+      config: { position: 'bottom-right', size: 'tiny' },
+    });
+
+    if (!vapiClient) {
+      toast('Failed to initialize VAPI client. Check your Public Key.', 'error');
+      return;
+    }
 
     const statusEl = document.getElementById('test-call-status');
     const orbEl = document.getElementById('test-call-orb');
@@ -469,6 +484,7 @@ function endTestCall() {
   }
   vapiClient = null;
   testCallActive = false;
+  document.getElementById('vapi-support-btn')?.remove();
   closeModal('test-call-modal');
 }
 
@@ -480,5 +496,6 @@ document.getElementById('test-call-modal')?.addEventListener('click', (e) => {
       vapiClient = null;
       testCallActive = false;
     }
+    document.getElementById('vapi-support-btn')?.remove();
   }
 });
